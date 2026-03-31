@@ -171,10 +171,25 @@ struct SourceAppInfo {
 
         guard let content = val as? String else { return "" }
 
-        // 在前 300 字元中搜尋 tty 模式：on ttysXXX
-        let searchRange = String(content.prefix(300))
-        if let range = searchRange.range(of: #"ttys\d+"#, options: .regularExpression) {
-            return String(searchRange[range])
+        // 搜尋 "on ttysXXX" 模式（登入訊息中的 tty）
+        // 先搜前 500 字元（效能考量），找不到再搜全文
+        let quickSearch = String(content.prefix(500))
+        if let range = quickSearch.range(of: #"on (ttys\d+)"#, options: .regularExpression) {
+            let match = quickSearch[range]
+            // 提取 ttysXXX 部分
+            if let ttyRange = match.range(of: #"ttys\d+"#, options: .regularExpression) {
+                return String(match[ttyRange])
+            }
+        }
+
+        // 全文搜尋（處理輸出較多的情況）
+        if content.count > 500 {
+            if let range = content.range(of: #"on (ttys\d+)"#, options: .regularExpression) {
+                let match = content[range]
+                if let ttyRange = match.range(of: #"ttys\d+"#, options: .regularExpression) {
+                    return String(match[ttyRange])
+                }
+            }
         }
 
         return ""
