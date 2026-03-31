@@ -28,8 +28,9 @@ class WindowManager {
             return exact
         }
 
-        // Fallback：同 pid + windowID 匹配
-        guard sourceApp.windowID != 0 else { return nil }
+        // Fallback：只有當 tabDescription 為空時才啟用（代表 tab bar 已隱藏，只剩一個分頁）
+        // 如果有 tabDescription 但精確匹配失敗，代表這個分頁確實沒有 panel
+        guard sourceApp.windowID != 0, sourceApp.tabDescription.isEmpty else { return nil }
 
         let candidates = bindings.filter {
             $0.pid == sourceApp.pid && $0.windowID == sourceApp.windowID
