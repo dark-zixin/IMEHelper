@@ -27,10 +27,13 @@ struct SourceAppInfo {
     /// CGWindowID（視窗存活期間唯一且穩定）
     let windowID: CGWindowID
 
-    /// 選中分頁的描述（透過 AXTabGroup 取得）
+    /// 分頁的登入行識別（如 "Last login: Tue Mar 31 20:32:57 on ttys026"，每個分頁唯一）
+    let loginLine: String
+
+    /// 選中分頁的描述（透過 AXTabGroup 取得，fallback 用）
     let tabDescription: String
 
-    /// 用於綁定識別的 key（PID + CGWindowID + 分頁描述）
+    /// 用於綁定識別的 key（三層 fallback：loginLine → tabDescription → windowID）
     var bindingKey: String {
         let windowPart: String
         if windowID != 0 {
@@ -39,8 +42,11 @@ struct SourceAppInfo {
             windowPart = "win:\(windowTitle)"
         }
 
+        // 分頁層：優先用 loginLine（唯一），fallback 到 tabDescription
         let tabPart: String
-        if !tabDescription.isEmpty {
+        if !loginLine.isEmpty {
+            tabPart = "|login:\(loginLine)"
+        } else if !tabDescription.isEmpty {
             tabPart = "|tab:\(tabDescription)"
         } else {
             tabPart = ""
@@ -66,6 +72,7 @@ struct SourceAppInfo {
             appName: appName,
             windowTitle: windowInfo.windowTitle,
             windowID: windowInfo.windowID,
+            loginLine: windowInfo.loginLine,
             tabDescription: windowInfo.tabDescription
         )
     }
@@ -87,6 +94,7 @@ struct SourceAppInfo {
             appName: appName,
             windowTitle: windowInfo.windowTitle,
             windowID: windowInfo.windowID,
+            loginLine: windowInfo.loginLine,
             tabDescription: windowInfo.tabDescription
         )
     }
@@ -96,6 +104,7 @@ struct SourceAppInfo {
     private struct WindowInfo {
         let windowTitle: String
         let windowID: CGWindowID
+        let loginLine: String
         let tabDescription: String
     }
 
@@ -111,7 +120,7 @@ struct SourceAppInfo {
         )
 
         guard result == .success, let window = focusedWindow else {
-            return WindowInfo(windowTitle: "", windowID: 0, tabDescription: "")
+            return WindowInfo(windowTitle: "", windowID: 0, loginLine: "", tabDescription: "")
         }
 
         let axWindow = window as! AXUIElement
@@ -138,9 +147,35 @@ struct SourceAppInfo {
         }
 
         let windowID = getCGWindowID(pid: pid, title: windowTitle, position: axPosition, size: axSize)
+
+        // 從焦點元素提取 loginLine
+        let loginLine = extractLoginLine(appElement: appElement)
+
+        // 分頁描述（fallback 用）
         let tabDesc = getSelectedTabDescription(window: axWindow)
 
-        return WindowInfo(windowTitle: windowTitle, windowID: windowID, tabDescription: tabDesc)
+        return WindowInfo(windowTitle: windowTitle, windowID: windowID, loginLine: loginLine, tabDescription: tabDesc)
+    }
+
+    /// 從焦點元素的 AXValue 中提取 Last login 行（每個分頁唯一）
+    private static func extractLoginLine(appElement: AXUIElement) -> String {
+        var focusedElement: AnyObject?
+        AXUIElementCopyAttributeValue(appElement, kAXFocusedUIElementAttribute as CFString, &focusedElement)
+
+        guard let element = focusedElement else { return "" }
+
+        let axEl = element as! AXUIElement
+        var val: AnyObject?
+        AXUIElementCopyAttributeValue(axEl, kAXValueAttribute as CFString, &val)
+
+        guard let content = val as? String, !content.isEmpty else { return "" }
+
+        // 搜尋 Last login 行（含時間戳和 tty，整行作為唯一識別）
+        if let range = content.range(of: #"Last login:.*on ttys\d+"#, options: .regularExpression) {
+            return String(content[range])
+        }
+
+        return ""
     }
 
     /// 從視窗的 AXTabGroup 中取得選中分頁的 AXDescription
