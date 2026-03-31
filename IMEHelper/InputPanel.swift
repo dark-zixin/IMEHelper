@@ -69,6 +69,26 @@ class InputPanel: NSPanel {
         setupVisualEffect()
         setupTextView()
         setupHintLabel()
+
+        // 監聽窗口移動，記錄位置
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(windowDidMoveNotification(_:)),
+            name: NSWindow.didMoveNotification,
+            object: self
+        )
+
+        // 監聽透明度變更
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(windowAlphaDidChange(_:)),
+            name: SettingsManager.windowAlphaDidChangeNotification,
+            object: nil
+        )
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
 
     // MARK: - UI 建構
@@ -79,7 +99,7 @@ class InputPanel: NSPanel {
         visualEffectView.material = .hudWindow
         visualEffectView.state = .active
         visualEffectView.blendingMode = .behindWindow
-        visualEffectView.alphaValue = 0.8
+        visualEffectView.alphaValue = SettingsManager.shared.windowAlpha
         self.isOpaque = false
         self.backgroundColor = .clear
         visualEffectView.translatesAutoresizingMaskIntoConstraints = false
@@ -188,52 +208,25 @@ class InputPanel: NSPanel {
     ///   - caretPosition: 游標在螢幕上的座標（左上角原點系統），若為 nil 則顯示在螢幕中央
     ///   - caretHeight: 游標高度，用來計算窗口偏移量
     func showAt(caretPosition: NSPoint?, caretHeight: CGFloat) {
-        let panelSize = self.frame.size
+        let settings = SettingsManager.shared
 
-        if let caret = caretPosition {
-            // Accessibility API 使用左上角原點座標系統
-            // 需要轉換為 AppKit 的左下角原點座標系統
-            guard let screen = NSScreen.screens.first(where: { NSMouseInRect(
-                NSPoint(x: caret.x, y: NSMaxY($0.frame) - caret.y),
-                $0.frame,
-                false
-            )}) ?? NSScreen.main else {
-                centerOnScreen()
-                return
-            }
+        switch settings.windowPositionMode {
+        case .followCaret:
+            // 跟著文字游標（原有邏輯）
+            positionAtCaret(caretPosition: caretPosition, caretHeight: caretHeight)
 
-            let screenFrame = screen.frame
-            let screenMaxY = NSMaxY(screenFrame)
-
-            // 將左上角原點的 y 轉換為左下角原點
-            // 游標下方偏移 4 點
-            let convertedY = screenMaxY - caret.y - caretHeight - 4
-            let panelX = caret.x
-            let panelY = convertedY - panelSize.height
-
-            // 確保窗口不超出螢幕邊界
-            var finalX = panelX
-            var finalY = panelY
-
-            // 右邊界檢查
-            if finalX + panelSize.width > NSMaxX(screenFrame) {
-                finalX = NSMaxX(screenFrame) - panelSize.width - 8
-            }
-
-            // 左邊界檢查
-            if finalX < NSMinX(screenFrame) {
-                finalX = NSMinX(screenFrame) + 8
-            }
-
-            // 下邊界檢查：如果窗口會超出螢幕底部，改放到游標上方
-            if finalY < NSMinY(screenFrame) {
-                finalY = screenMaxY - caret.y + 4
-            }
-
-            self.setFrameOrigin(NSPoint(x: finalX, y: finalY))
-        } else {
-            // 沒有游標位置，顯示在螢幕中央
+        case .screenCenter:
+            // 螢幕中央
             centerOnScreen()
+
+        case .rememberLast:
+            // 記住上次位置
+            if let lastPosition = settings.lastWindowPosition {
+                self.setFrameOrigin(lastPosition)
+            } else {
+                // 沒有上次位置記錄，fallback 到游標位置
+                positionAtCaret(caretPosition: caretPosition, caretHeight: caretHeight)
+            }
         }
 
         // 顯示窗口並取得焦點
@@ -270,9 +263,71 @@ class InputPanel: NSPanel {
 
     // MARK: - 私有方法
 
+    /// 根據游標位置定位窗口
+    private func positionAtCaret(caretPosition: NSPoint?, caretHeight: CGFloat) {
+        let panelSize = self.frame.size
+
+        guard let caret = caretPosition else {
+            // 沒有游標位置，顯示在螢幕中央
+            centerOnScreen()
+            return
+        }
+
+        // Accessibility API 使用左上角原點座標系統
+        // 需要轉換為 AppKit 的左下角原點座標系統
+        guard let screen = NSScreen.screens.first(where: { NSMouseInRect(
+            NSPoint(x: caret.x, y: NSMaxY($0.frame) - caret.y),
+            $0.frame,
+            false
+        )}) ?? NSScreen.main else {
+            centerOnScreen()
+            return
+        }
+
+        let screenFrame = screen.frame
+        let screenMaxY = NSMaxY(screenFrame)
+
+        // 將左上角原點的 y 轉換為左下角原點
+        // 游標下方偏移 4 點
+        let convertedY = screenMaxY - caret.y - caretHeight - 4
+        let panelX = caret.x
+        let panelY = convertedY - panelSize.height
+
+        // 確保窗口不超出螢幕邊界
+        var finalX = panelX
+        var finalY = panelY
+
+        // 右邊界檢查
+        if finalX + panelSize.width > NSMaxX(screenFrame) {
+            finalX = NSMaxX(screenFrame) - panelSize.width - 8
+        }
+
+        // 左邊界檢查
+        if finalX < NSMinX(screenFrame) {
+            finalX = NSMinX(screenFrame) + 8
+        }
+
+        // 下邊界檢查：如果窗口會超出螢幕底部，改放到游標上方
+        if finalY < NSMinY(screenFrame) {
+            finalY = screenMaxY - caret.y + 4
+        }
+
+        self.setFrameOrigin(NSPoint(x: finalX, y: finalY))
+    }
+
     /// 將窗口置中於螢幕
     private func centerOnScreen() {
         self.center()
+    }
+
+    /// 窗口移動通知處理 — 記錄位置到 SettingsManager
+    @objc private func windowDidMoveNotification(_ notification: Notification) {
+        SettingsManager.shared.lastWindowPosition = self.frame.origin
+    }
+
+    /// 透明度變更通知處理 — 即時更新窗口透明度
+    @objc private func windowAlphaDidChange(_ notification: Notification) {
+        visualEffectView.alphaValue = SettingsManager.shared.windowAlpha
     }
 
     /// 顯示底部提示標籤

@@ -6,7 +6,6 @@
 //
 
 import Cocoa
-import ServiceManagement
 import ApplicationServices
 
 @main
@@ -77,22 +76,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
         // 建立下拉選單
         let menu = NSMenu()
 
-        // 設定選項（目前不做事，Phase 6 實作）
-        let settingsItem = NSMenuItem(title: "設定...", action: nil, keyEquivalent: "")
+        // 設定選項
+        let settingsItem = NSMenuItem(title: "設定...", action: #selector(openSettings(_:)), keyEquivalent: "")
+        settingsItem.target = self
         menu.addItem(settingsItem)
-
-        menu.addItem(NSMenuItem.separator())
-
-        // 開機時啟動（checkbox）
-        let launchAtLoginItem = NSMenuItem(
-            title: "開機時啟動",
-            action: #selector(toggleLaunchAtLogin(_:)),
-            keyEquivalent: ""
-        )
-        launchAtLoginItem.target = self
-        // 根據目前狀態設定勾選
-        launchAtLoginItem.state = isLaunchAtLoginEnabled() ? .on : .off
-        menu.addItem(launchAtLoginItem)
 
         menu.addItem(NSMenuItem.separator())
 
@@ -107,30 +94,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
         statusItem.menu = menu
     }
 
-    // MARK: - 開機啟動管理
+    // MARK: - 設定視窗
 
-    /// 切換開機時啟動的狀態
-    @objc private func toggleLaunchAtLogin(_ sender: NSMenuItem) {
-        let service = SMAppService.mainApp
-
-        do {
-            if sender.state == .on {
-                // 目前已啟用，取消註冊
-                try service.unregister()
-                sender.state = .off
-            } else {
-                // 目前未啟用，進行註冊
-                try service.register()
-                sender.state = .on
-            }
-        } catch {
-            NSLog("切換開機啟動失敗: \(error.localizedDescription)")
-        }
-    }
-
-    /// 檢查目前是否已設定開機啟動
-    private func isLaunchAtLoginEnabled() -> Bool {
-        return SMAppService.mainApp.status == .enabled
+    /// 開啟設定視窗
+    @objc private func openSettings(_ sender: Any?) {
+        SettingsWindowController.show()
     }
 
     // MARK: - 全域快捷鍵
@@ -291,6 +259,19 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
         guard let sourceInfo = panel.sourceAppInfo else {
             NSLog("AppDelegate: 沒有來源 app 資訊，無法回填")
             panel.hidePanel()
+            return
+        }
+
+        // 檢查目標 app 是否還存在
+        guard let targetApp = NSRunningApplication(processIdentifier: sourceInfo.pid),
+              !targetApp.isTerminated else {
+            // 目標已關閉，顯示警告，保留文字不關閉窗口
+            let alert = NSAlert()
+            alert.messageText = "目標視窗已關閉"
+            alert.informativeText = "「\(sourceInfo.appName)」已關閉，無法回填文字。\n文字已保留在輸入窗口中，你可以手動複製。"
+            alert.alertStyle = .warning
+            alert.addButton(withTitle: "確定")
+            alert.runModal()
             return
         }
 
