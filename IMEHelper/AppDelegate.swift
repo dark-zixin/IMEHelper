@@ -335,8 +335,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
         // 更新追蹤 key
         lastFrontmostKey = sourceApp.bindingKey
 
-        // 檢查是否有對應的窗口且有內容，且不是被手動隱藏的（精確匹配，不 fallback）
-        if let existingPanel = windowManager.find(for: sourceApp),
+        // 檢查是否有對應的窗口且有內容，且不是被手動隱藏的
+        // 使用 fallback 匹配處理 tab bar 消失的情況
+        if let existingPanel = windowManager.findWithFallback(for: sourceApp),
            !existingPanel.text.isEmpty,
            !existingPanel.isManuallyHidden {
             existingPanel.setSourceApp(sourceApp)
@@ -360,13 +361,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
         // 檢查目標 app 是否還存在
         guard let targetApp = NSRunningApplication(processIdentifier: sourceInfo.pid),
               !targetApp.isTerminated else {
-            // 目標已關閉，顯示警告，保留文字不關閉窗口
-            let alert = NSAlert()
-            alert.messageText = "目標視窗已關閉"
-            alert.informativeText = "「\(sourceInfo.appName)」已關閉，無法回填文字。\n文字已保留在輸入窗口中，你可以手動複製。"
-            alert.alertStyle = .warning
-            alert.addButton(withTitle: "確定")
-            alert.runModal()
+            // 目標已關閉，標記為孤立
+            windowManager.remove(panel: panel)
+            panel.markAsOrphaned()
             return
         }
 

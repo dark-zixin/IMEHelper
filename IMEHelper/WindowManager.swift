@@ -121,6 +121,9 @@ class WindowManager {
     func cleanupClosedTabs(windowID: CGWindowID, currentTabDescriptions: [String]) -> [InputPanel] {
         guard windowID != 0 else { return [] }
 
+        // 如果 tab 列表為空，代表 tab bar 已隱藏（只剩一個分頁），不做清理
+        guard !currentTabDescriptions.isEmpty else { return [] }
+
         // 統計目前各描述出現的次數
         var availableCounts: [String: Int] = [:]
         for desc in currentTabDescriptions where !desc.isEmpty {
