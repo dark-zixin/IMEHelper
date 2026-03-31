@@ -183,6 +183,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
             } else {
                 // 窗口存在但隱藏中 → 重新顯示
                 existingPanel.isManuallyHidden = false
+                lastFrontmostKey = sourceApp.bindingKey
                 NSApp.activate(ignoringOtherApps: true)
                 existingPanel.makeKeyAndOrderFront(nil)
                 existingPanel.focusTextView()
