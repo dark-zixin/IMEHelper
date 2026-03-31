@@ -21,6 +21,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
     // 浮動輸入窗口（Phase 5 才做多窗口，目前只用一個）
     private var inputPanel: InputPanel?
 
+    // 文字回填注入器
+    private var textInjector = TextInjector()
+
     func applicationDidFinishLaunching(_ aNotification: Notification) {
         // 建立 Menu Bar 圖示
         setupStatusItem()
@@ -169,8 +172,24 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
 
     func inputPanelDidSubmit(_ panel: InputPanel, text: String) {
         NSLog("AppDelegate: 收到送出文字，長度 \(text.count)")
-        // Phase 4 才實作回填，目前只關閉窗口
-        panel.hidePanel()
+
+        guard let sourceInfo = panel.sourceAppInfo else {
+            NSLog("AppDelegate: 沒有來源 app 資訊，無法回填")
+            panel.hidePanel()
+            return
+        }
+
+        // 只隱藏視窗，不觸發 hidePanel 的完整邏輯
+        // 因為 TextInjector 會負責 activate 目標 app，避免與 hidePanel 的 activate 衝突
+        panel.orderOut(nil)
+
+        // 用 TextInjector 回填文字
+        textInjector.inject(text: text, targetPID: sourceInfo.pid) {
+            // 回填完成後清理窗口狀態
+            panel.text = ""
+            panel.resetEscState()
+            NSLog("AppDelegate: 文字回填完成")
+        }
     }
 
     func inputPanelDidClose(_ panel: InputPanel) {
