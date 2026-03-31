@@ -118,38 +118,59 @@ class WindowManager {
     /// - Parameter currentTabDescriptions: 當前視窗中所有分頁的描述列表
     /// - Parameter windowID: 要檢查的視窗 CGWindowID
     @discardableResult
-    func cleanupClosedTabs(windowID: CGWindowID, currentTabDescriptions: [String]) -> [InputPanel] {
+    func cleanupClosedTabs(windowID: CGWindowID, currentTabDescriptions: [String], windowTitle: String) -> [InputPanel] {
         guard windowID != 0 else { return [] }
 
-        // 如果 tab 列表為空，代表 tab bar 已隱藏（只剩一個分頁），不做清理
-        guard !currentTabDescriptions.isEmpty else { return [] }
-
-        // 統計目前各描述出現的次數
-        var availableCounts: [String: Int] = [:]
-        for desc in currentTabDescriptions where !desc.isEmpty {
-            availableCounts[desc, default: 0] += 1
+        // 找出同 windowID 下帶 tab 描述的所有綁定
+        let tabBindings = bindings.filter {
+            $0.windowID == windowID && $0.bindingKey.contains("|tab:")
         }
+        guard !tabBindings.isEmpty else { return [] }
 
-        var cleanedPanels: [InputPanel] = []
-        bindings.removeAll { binding in
-            guard binding.windowID == windowID else { return false }
-
-            // 從 bindingKey 提取 tab 描述
-            guard let tabRange = binding.bindingKey.range(of: "|tab:") else { return false }
-            let tabDesc = String(binding.bindingKey[tabRange.upperBound...])
-
-            guard !tabDesc.isEmpty else { return false }
-
-            let count = availableCounts[tabDesc, default: 0]
-            if count > 0 {
-                availableCounts[tabDesc] = count - 1
-                return false  // 分頁還在
+        if !currentTabDescriptions.isEmpty {
+            // 有 tab 列表：用描述計數比對
+            var availableCounts: [String: Int] = [:]
+            for desc in currentTabDescriptions where !desc.isEmpty {
+                availableCounts[desc, default: 0] += 1
             }
 
-            // 分頁已不存在
-            cleanedPanels.append(binding.panel)
-            return true
+            var cleanedPanels: [InputPanel] = []
+            bindings.removeAll { binding in
+                guard binding.windowID == windowID,
+                      let tabRange = binding.bindingKey.range(of: "|tab:") else { return false }
+                let tabDesc = String(binding.bindingKey[tabRange.upperBound...])
+                guard !tabDesc.isEmpty else { return false }
+
+                let count = availableCounts[tabDesc, default: 0]
+                if count > 0 {
+                    availableCounts[tabDesc] = count - 1
+                    return false
+                }
+
+                cleanedPanels.append(binding.panel)
+                return true
+            }
+            return cleanedPanels
+        } else {
+            // tab bar 隱藏（只剩一個分頁）：用視窗標題比對
+            // 分頁描述通常包含視窗標題（例如描述 "dark@Mac: ~ (-zsh)" 包含標題 "dark@Mac: ~"）
+            var cleanedPanels: [InputPanel] = []
+            bindings.removeAll { binding in
+                guard binding.windowID == windowID,
+                      let tabRange = binding.bindingKey.range(of: "|tab:") else { return false }
+                let tabDesc = String(binding.bindingKey[tabRange.upperBound...])
+                guard !tabDesc.isEmpty else { return false }
+
+                // 如果分頁描述包含視窗標題，視為存活的分頁
+                if tabDesc.contains(windowTitle) && !windowTitle.isEmpty {
+                    return false
+                }
+
+                // 不匹配的分頁已關閉
+                cleanedPanels.append(binding.panel)
+                return true
+            }
+            return cleanedPanels
         }
-        return cleanedPanels
     }
 }

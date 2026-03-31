@@ -297,7 +297,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
             let currentTabs = SourceAppInfo.getAllTabDescriptions(pid: sourceApp.pid)
             let closedTabPanels = windowManager.cleanupClosedTabs(
                 windowID: sourceApp.windowID,
-                currentTabDescriptions: currentTabs
+                currentTabDescriptions: currentTabs,
+                windowTitle: sourceApp.windowTitle
             )
             handleOrphanedPanels(closedTabPanels)
         }
