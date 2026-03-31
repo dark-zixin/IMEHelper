@@ -170,6 +170,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
 
         // 檢查是否已有對應的窗口
         if let existingPanel = windowManager.find(for: sourceApp) {
+            existingPanel.setSourceApp(sourceApp)
+
             if existingPanel.isVisible {
                 // 窗口已顯示 → 隱藏（toggle）
                 existingPanel.orderOut(nil)
@@ -277,7 +279,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
         }
     }
 
-    /// 嘗試恢復前景視窗對應的 InputPanel
     /// 檢查並處理已關閉視窗的 panel
     private func handleClosedWindows() {
         let closedPanels = windowManager.cleanupClosedWindows()
@@ -321,6 +322,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
         if let existingPanel = windowManager.find(for: sourceApp),
            !existingPanel.text.isEmpty,
            !existingPanel.isManuallyHidden {
+            existingPanel.setSourceApp(sourceApp)
             NSApp.activate(ignoringOtherApps: true)
             existingPanel.makeKeyAndOrderFront(nil)
             existingPanel.focusTextView()

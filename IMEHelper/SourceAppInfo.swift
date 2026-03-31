@@ -123,7 +123,12 @@ struct SourceAppInfo {
         )
 
         guard result == .success, let window = focusedWindow else {
-            return WindowInfo(windowTitle: "", windowID: 0, tabDescription: "", tabIndex: -1)
+            return WindowInfo(
+                windowTitle: "",
+                windowID: 0,
+                tabDescription: "",
+                tabIndex: -1
+            )
         }
 
         let axWindow = window as! AXUIElement
@@ -155,7 +160,12 @@ struct SourceAppInfo {
         // 取得選中分頁資訊
         let (tabDesc, tabIdx) = getSelectedTabInfo(window: axWindow)
 
-        return WindowInfo(windowTitle: windowTitle, windowID: windowID, tabDescription: tabDesc, tabIndex: tabIdx)
+        return WindowInfo(
+            windowTitle: windowTitle,
+            windowID: windowID,
+            tabDescription: tabDesc,
+            tabIndex: tabIdx
+        )
     }
 
     /// 透過 CGWindowListCopyWindowInfo 比對取得 CGWindowID

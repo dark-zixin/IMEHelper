@@ -14,7 +14,7 @@ class WindowManager {
     /// 所有的窗口綁定
     private var bindings: [WindowBinding] = []
 
-    /// 根據來源 app 資訊查詢已存在的窗口
+    /// 根據來源 app 資訊查詢已存在的窗口（精確匹配 bindingKey）
     func find(for sourceApp: SourceAppInfo) -> InputPanel? {
         return bindings.first(where: { $0.bindingKey == sourceApp.bindingKey })?.panel
     }
@@ -31,7 +31,6 @@ class WindowManager {
     }
 
     /// 移除指定的 InputPanel 綁定
-    /// - Parameter panel: 要移除的 InputPanel
     func remove(panel: InputPanel) {
         bindings.removeAll(where: { $0.panel === panel })
     }
@@ -39,7 +38,7 @@ class WindowManager {
     /// 隱藏所有可見的窗口（只用 orderOut，不觸發完整的 hidePanel）
     func hideAll() {
         for binding in bindings {
-            if binding.panel.isVisible {
+            if binding.panel.isVisible && !binding.panel.isOrphaned {
                 binding.panel.orderOut(nil)
             }
         }
@@ -49,7 +48,6 @@ class WindowManager {
     var allBindings: [WindowBinding] { bindings }
 
     /// 移除 PID 已不存在的綁定（清理已關閉的 app）
-    /// - Returns: 被清理的 panel 列表，由呼叫端負責處理
     @discardableResult
     func cleanupTerminatedApps() -> [InputPanel] {
         var cleanedPanels: [InputPanel] = []
@@ -68,10 +66,8 @@ class WindowManager {
     }
 
     /// 檢查所有綁定的視窗是否還存在（透過 CGWindowID 驗證）
-    /// - Returns: 視窗已消失的 panel 列表，由呼叫端負責處理
     @discardableResult
     func cleanupClosedWindows() -> [InputPanel] {
-        // 取得目前所有 onscreen 的視窗 ID
         guard let windowInfoList = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] else {
             return []
         }
@@ -85,7 +81,6 @@ class WindowManager {
 
         var cleanedPanels: [InputPanel] = []
         bindings.removeAll { binding in
-            // windowID 為 0 代表無法取得，跳過不檢查
             guard binding.windowID != 0 else { return false }
 
             if !activeWindowIDs.contains(binding.windowID) {
