@@ -335,9 +335,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
         // 更新追蹤 key
         lastFrontmostKey = sourceApp.bindingKey
 
-        // 檢查是否有對應的窗口且有內容，且不是被手動隱藏的
-        // 使用 fallback 匹配處理 tab bar 消失的情況
-        if let existingPanel = windowManager.findWithFallback(for: sourceApp),
+        // 檢查是否有對應的窗口且有內容，且不是被手動隱藏的（精確匹配）
+        // tab bar 消失時自動恢復不生效，需使用者按快捷鍵觸發 fallback
+        if let existingPanel = windowManager.find(for: sourceApp),
            !existingPanel.text.isEmpty,
            !existingPanel.isManuallyHidden {
             existingPanel.setSourceApp(sourceApp)
