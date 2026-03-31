@@ -151,6 +151,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // 清空之前的文字
         panel.text = ""
 
+        // 背景 app 需要先 activate 才能顯示視窗
+        NSApp.activate(ignoringOtherApps: true)
+
         // 顯示在游標位置或螢幕中央
         panel.showAt(
             caretPosition: caretInfo?.position,

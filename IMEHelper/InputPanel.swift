@@ -55,6 +55,9 @@ class InputPanel: NSPanel {
         visualEffectView.material = .hudWindow
         visualEffectView.state = .active
         visualEffectView.blendingMode = .behindWindow
+        visualEffectView.alphaValue = 0.8
+        self.isOpaque = false
+        self.backgroundColor = .clear
         visualEffectView.translatesAutoresizingMaskIntoConstraints = false
 
         self.contentView = visualEffectView
@@ -187,10 +190,12 @@ class InputPanel: NSPanel {
         }
 
         // 顯示窗口並取得焦點
+        NSLog("InputPanel: 準備顯示窗口，位置 x=\(self.frame.origin.x), y=\(self.frame.origin.y)")
         self.makeKeyAndOrderFront(nil)
 
         // 確保 textView 取得焦點
         self.makeFirstResponder(textView)
+        NSLog("InputPanel: 窗口已顯示")
     }
 
     /// 隱藏窗口
