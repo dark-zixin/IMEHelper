@@ -15,21 +15,15 @@ class WindowManager {
     private var bindings: [WindowBinding] = []
 
     /// 根據來源 app 資訊查詢已存在的窗口
-    /// - Parameter sourceApp: 來源 app 資訊
-    /// - Returns: 對應的 InputPanel，若不存在則回傳 nil
     func find(for sourceApp: SourceAppInfo) -> InputPanel? {
-        let key = "\(sourceApp.pid)_\(sourceApp.windowTitle)"
-        return bindings.first(where: { $0.bindingKey == key })?.panel
+        return bindings.first(where: { $0.bindingKey == sourceApp.bindingKey })?.panel
     }
 
     /// 綁定新的 InputPanel 到來源 app
-    /// - Parameters:
-    ///   - panel: 要綁定的 InputPanel
-    ///   - sourceApp: 來源 app 資訊
     func bind(panel: InputPanel, to sourceApp: SourceAppInfo) {
         let binding = WindowBinding(
+            bindingKey: sourceApp.bindingKey,
             pid: sourceApp.pid,
-            windowTitle: sourceApp.windowTitle,
             panel: panel
         )
         bindings.append(binding)

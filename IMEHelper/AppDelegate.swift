@@ -233,7 +233,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
             return
         }
 
-        let currentKey = "\(sourceApp.pid)_\(sourceApp.windowTitle)"
+        let currentKey = sourceApp.bindingKey
 
         // 標題沒變，不做處理
         guard currentKey != lastFrontmostKey else {
@@ -266,7 +266,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
         }
 
         // 更新追蹤 key
-        lastFrontmostKey = "\(sourceApp.pid)_\(sourceApp.windowTitle)"
+        lastFrontmostKey = sourceApp.bindingKey
 
         // 檢查是否有對應的窗口且有內容，且不是被手動隱藏的
         if let existingPanel = windowManager.find(for: sourceApp),
@@ -302,13 +302,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
             return
         }
 
-        // 驗證目標視窗標題是否一致（防止來源視窗關閉但 app 仍在的情況）
-        if !sourceInfo.windowTitle.isEmpty,
-           let currentSourceApp = SourceAppInfo.fromApp(pid: sourceInfo.pid),
-           currentSourceApp.windowTitle != sourceInfo.windowTitle {
+        // 驗證目標視窗/分頁是否一致（防止來源視窗關閉但 app 仍在的情況）
+        if let currentSourceApp = SourceAppInfo.fromApp(pid: sourceInfo.pid),
+           currentSourceApp.bindingKey != sourceInfo.bindingKey {
+            let currentDesc = currentSourceApp.tabDescription.isEmpty ? currentSourceApp.windowTitle : currentSourceApp.tabDescription
+            let sourceDesc = sourceInfo.tabDescription.isEmpty ? sourceInfo.windowTitle : sourceInfo.tabDescription
             let alert = NSAlert()
             alert.messageText = "目標視窗可能已變更"
-            alert.informativeText = "原始目標視窗「\(sourceInfo.windowTitle)」已不是目前的前景視窗。\n目前視窗為「\(currentSourceApp.windowTitle)」。\n\n是否仍要送出文字？"
+            alert.informativeText = "原始目標「\(sourceDesc)」已不是目前的前景視窗。\n目前為「\(currentDesc)」。\n\n是否仍要送出文字？"
             alert.alertStyle = .warning
             alert.addButton(withTitle: "送出")
             alert.addButton(withTitle: "取消")
@@ -336,7 +337,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
             self.isInjecting = false
             // 更新追蹤 key
             if let current = SourceAppInfo.fromFrontmostApp() {
-                self.lastFrontmostKey = "\(current.pid)_\(current.windowTitle)"
+                self.lastFrontmostKey = current.bindingKey
             }
             NSLog("AppDelegate: 文字回填完成")
         }
