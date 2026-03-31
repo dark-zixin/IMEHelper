@@ -68,7 +68,7 @@ class WindowManager {
     /// 檢查所有綁定的視窗是否還存在（透過 CGWindowID 驗證）
     @discardableResult
     func cleanupClosedWindows() -> [InputPanel] {
-        guard let windowInfoList = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] else {
+        guard let windowInfoList = CGWindowListCopyWindowInfo([.optionAll], kCGNullWindowID) as? [[String: Any]] else {
             return []
         }
 
