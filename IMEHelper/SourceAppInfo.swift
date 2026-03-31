@@ -24,18 +24,34 @@ struct SourceAppInfo {
     /// 視窗標題
     let windowTitle: String
 
-    /// 選中分頁的描述（透過 AXTabGroup 取得，比視窗標題更精確）
+    /// CGWindowID（視窗存活期間唯一且穩定）
+    let windowID: CGWindowID
+
+    /// 選中分頁的描述（透過 AXTabGroup 取得）
     let tabDescription: String
 
     /// 選中分頁的索引（用來區分同描述的不同分頁）
     let tabIndex: Int
 
-    /// 用於綁定識別的 key
+    /// 用於綁定識別的 key（三層結構：PID + 視窗 + 分頁）
     var bindingKey: String {
-        if !tabDescription.isEmpty {
-            return "\(pid)_\(tabDescription)_\(tabIndex)"
+        // 視窗層：優先用 CGWindowID，fallback 到 windowTitle
+        let windowPart: String
+        if windowID != 0 {
+            windowPart = "win:\(windowID)"
+        } else {
+            windowPart = "win:\(windowTitle)"
         }
-        return "\(pid)_\(windowTitle)"
+
+        // 分頁層：有分頁資訊就加上
+        let tabPart: String
+        if !tabDescription.isEmpty {
+            tabPart = "|tab:\(tabDescription)|idx:\(tabIndex)"
+        } else {
+            tabPart = ""
+        }
+
+        return "\(pid)|\(windowPart)\(tabPart)"
     }
 
     /// 從當前前景 app 取得資訊
@@ -56,6 +72,7 @@ struct SourceAppInfo {
             bundleIdentifier: bundleId,
             appName: appName,
             windowTitle: windowInfo.windowTitle,
+            windowID: windowInfo.windowID,
             tabDescription: windowInfo.tabDescription,
             tabIndex: windowInfo.tabIndex
         )
@@ -77,13 +94,24 @@ struct SourceAppInfo {
             bundleIdentifier: bundleId,
             appName: appName,
             windowTitle: windowInfo.windowTitle,
+            windowID: windowInfo.windowID,
             tabDescription: windowInfo.tabDescription,
             tabIndex: windowInfo.tabIndex
         )
     }
 
-    /// 透過 Accessibility API 取得焦點視窗標題、選中分頁描述和索引
-    private static func getWindowInfo(pid: pid_t) -> (windowTitle: String, tabDescription: String, tabIndex: Int) {
+    // MARK: - 私有方法
+
+    /// 視窗資訊結構
+    private struct WindowInfo {
+        let windowTitle: String
+        let windowID: CGWindowID
+        let tabDescription: String
+        let tabIndex: Int
+    }
+
+    /// 透過 Accessibility API 和 CGWindowList 取得焦點視窗完整資訊
+    private static func getWindowInfo(pid: pid_t) -> WindowInfo {
         let appElement = AXUIElementCreateApplication(pid)
 
         // 取得焦點視窗
@@ -95,7 +123,7 @@ struct SourceAppInfo {
         )
 
         guard result == .success, let window = focusedWindow else {
-            return ("", "", -1)
+            return WindowInfo(windowTitle: "", windowID: 0, tabDescription: "", tabIndex: -1)
         }
 
         let axWindow = window as! AXUIElement
@@ -105,15 +133,88 @@ struct SourceAppInfo {
         AXUIElementCopyAttributeValue(axWindow, kAXTitleAttribute as CFString, &titleValue)
         let windowTitle = titleValue as? String ?? ""
 
-        // 嘗試取得選中分頁的描述和索引
+        // 取得視窗位置和大小（用來匹配 CGWindowID）
+        var axPosition = CGPoint.zero
+        var axSize = CGSize.zero
+
+        var posValue: AnyObject?
+        AXUIElementCopyAttributeValue(axWindow, kAXPositionAttribute as CFString, &posValue)
+        if let pos = posValue {
+            AXValueGetValue(pos as! AXValue, .cgPoint, &axPosition)
+        }
+
+        var sizeValue: AnyObject?
+        AXUIElementCopyAttributeValue(axWindow, kAXSizeAttribute as CFString, &sizeValue)
+        if let sz = sizeValue {
+            AXValueGetValue(sz as! AXValue, .cgSize, &axSize)
+        }
+
+        // 取得 CGWindowID
+        let windowID = getCGWindowID(pid: pid, title: windowTitle, position: axPosition, size: axSize)
+
+        // 取得選中分頁資訊
         let (tabDesc, tabIdx) = getSelectedTabInfo(window: axWindow)
 
-        return (windowTitle, tabDesc, tabIdx)
+        return WindowInfo(windowTitle: windowTitle, windowID: windowID, tabDescription: tabDesc, tabIndex: tabIdx)
+    }
+
+    /// 透過 CGWindowListCopyWindowInfo 比對取得 CGWindowID
+    private static func getCGWindowID(pid: pid_t, title: String, position: CGPoint, size: CGSize) -> CGWindowID {
+        guard let windowInfoList = CGWindowListCopyWindowInfo([.optionAll], kCGNullWindowID) as? [[String: Any]] else {
+            return 0
+        }
+
+        for info in windowInfoList {
+            guard let ownerPID = info[kCGWindowOwnerPID as String] as? pid_t,
+                  ownerPID == pid,
+                  let layer = info[kCGWindowLayer as String] as? Int,
+                  layer == 0 else {
+                continue
+            }
+
+            let wid = info[kCGWindowNumber as String] as? CGWindowID ?? 0
+            let wTitle = info[kCGWindowName as String] as? String ?? ""
+            let bounds = info[kCGWindowBounds as String] as? [String: CGFloat] ?? [:]
+            let w = bounds["Width"] ?? 0
+            let h = bounds["Height"] ?? 0
+
+            // 用標題 + 大小比對（位置在座標系統轉換後可能有差異，大小比較穩定）
+            if wTitle == title && abs(w - size.width) < 2 && abs(h - size.height) < 2 {
+                return wid
+            }
+        }
+
+        // 如果標題匹配失敗（可能標題有變動），用位置 + 大小比對
+        let screenHeight = NSScreen.main?.frame.height ?? 1440
+        for info in windowInfoList {
+            guard let ownerPID = info[kCGWindowOwnerPID as String] as? pid_t,
+                  ownerPID == pid,
+                  let layer = info[kCGWindowLayer as String] as? Int,
+                  layer == 0 else {
+                continue
+            }
+
+            let wid = info[kCGWindowNumber as String] as? CGWindowID ?? 0
+            let bounds = info[kCGWindowBounds as String] as? [String: CGFloat] ?? [:]
+            let x = bounds["X"] ?? 0
+            let y = bounds["Y"] ?? 0
+            let w = bounds["Width"] ?? 0
+            let h = bounds["Height"] ?? 0
+
+            // AXPosition 是左下角原點，CGWindowList 是左上角原點
+            // AX y 轉 CG y：cgY = screenHeight - axY - height
+            // 但 AXPosition 回傳的其實是左上角原點（跟 CGWindowList 一樣）
+            if abs(x - position.x) < 2 && abs(y - position.y) < 2 &&
+               abs(w - size.width) < 2 && abs(h - size.height) < 2 {
+                return wid
+            }
+        }
+
+        return 0
     }
 
     /// 從視窗的 AXTabGroup 中找到選中的分頁，回傳其 AXDescription 和索引
     private static func getSelectedTabInfo(window: AXUIElement) -> (description: String, index: Int) {
-        // 取得視窗的子元素
         var children: AnyObject?
         AXUIElementCopyAttributeValue(window, kAXChildrenAttribute as CFString, &children)
 
@@ -121,7 +222,6 @@ struct SourceAppInfo {
             return ("", -1)
         }
 
-        // 找到 AXTabGroup
         for child in kids {
             var role: AnyObject?
             AXUIElementCopyAttributeValue(child, kAXRoleAttribute as CFString, &role)
@@ -130,7 +230,6 @@ struct SourceAppInfo {
                 continue
             }
 
-            // 列舉 tab group 的子元素（各分頁）
             var tabChildren: AnyObject?
             AXUIElementCopyAttributeValue(child, kAXChildrenAttribute as CFString, &tabChildren)
 
@@ -140,19 +239,16 @@ struct SourceAppInfo {
 
             var tabIndex = 0
             for tab in tabs {
-                // 檢查是否為 AXRadioButton（分頁）
                 var tabRole: AnyObject?
                 AXUIElementCopyAttributeValue(tab, kAXRoleAttribute as CFString, &tabRole)
                 guard (tabRole as? String) == "AXRadioButton" else {
                     continue
                 }
 
-                // 檢查是否為選中的分頁（AXValue = 1）
                 var value: AnyObject?
                 AXUIElementCopyAttributeValue(tab, kAXValueAttribute as CFString, &value)
 
                 if let numValue = value as? NSNumber, numValue.intValue == 1 {
-                    // 取得分頁描述
                     var desc: AnyObject?
                     AXUIElementCopyAttributeValue(tab, kAXDescriptionAttribute as CFString, &desc)
                     return (desc as? String ?? "", tabIndex)
