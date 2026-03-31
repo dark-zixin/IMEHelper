@@ -33,7 +33,9 @@ struct SourceAppInfo {
     /// 選中分頁的索引（用來區分同描述的不同分頁）
     let tabIndex: Int
 
-    /// 用於綁定識別的 key（三層結構：PID + 視窗 + 分頁）
+    /// 用於綁定識別的 key（PID + 視窗 + 分頁描述）
+    /// 注意：不含 tabIndex，因為關閉分頁會導致索引位移
+    /// 同描述的分頁會共用同一個 panel（已知限制，v2 用 app adapter 解決）
     var bindingKey: String {
         // 視窗層：優先用 CGWindowID，fallback 到 windowTitle
         let windowPart: String
@@ -43,10 +45,10 @@ struct SourceAppInfo {
             windowPart = "win:\(windowTitle)"
         }
 
-        // 分頁層：有分頁資訊就加上
+        // 分頁層：有分頁描述就加上（不含 index）
         let tabPart: String
         if !tabDescription.isEmpty {
-            tabPart = "|tab:\(tabDescription)|idx:\(tabIndex)"
+            tabPart = "|tab:\(tabDescription)"
         } else {
             tabPart = ""
         }
