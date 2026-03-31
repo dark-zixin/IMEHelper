@@ -199,6 +199,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
         // 綁定到 WindowManager
         windowManager.bind(panel: panel, to: sourceApp)
 
+        // 更新追蹤 key，防止 timer 把剛顯示的 panel 當成「標題變化」隱藏掉
+        lastFrontmostKey = sourceApp.bindingKey
+
         // 背景 app 需要先 activate 才能顯示視窗
         NSApp.activate(ignoringOtherApps: true)
 
