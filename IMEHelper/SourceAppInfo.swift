@@ -27,10 +27,15 @@ struct SourceAppInfo {
     /// 選中分頁的描述（透過 AXTabGroup 取得，比視窗標題更精確）
     let tabDescription: String
 
-    /// 用於綁定識別的 key（優先使用 tabDescription，fallback 到 windowTitle）
+    /// 選中分頁的索引（用來區分同描述的不同分頁）
+    let tabIndex: Int
+
+    /// 用於綁定識別的 key
     var bindingKey: String {
-        let identifier = tabDescription.isEmpty ? windowTitle : tabDescription
-        return "\(pid)_\(identifier)"
+        if !tabDescription.isEmpty {
+            return "\(pid)_\(tabDescription)_\(tabIndex)"
+        }
+        return "\(pid)_\(windowTitle)"
     }
 
     /// 從當前前景 app 取得資訊
@@ -44,14 +49,15 @@ struct SourceAppInfo {
         let appName = frontApp.localizedName ?? "未知 App"
         let bundleId = frontApp.bundleIdentifier
 
-        let (windowTitle, tabDesc) = getWindowInfo(pid: pid)
+        let windowInfo = getWindowInfo(pid: pid)
 
         return SourceAppInfo(
             pid: pid,
             bundleIdentifier: bundleId,
             appName: appName,
-            windowTitle: windowTitle,
-            tabDescription: tabDesc
+            windowTitle: windowInfo.windowTitle,
+            tabDescription: windowInfo.tabDescription,
+            tabIndex: windowInfo.tabIndex
         )
     }
 
@@ -64,19 +70,20 @@ struct SourceAppInfo {
 
         let appName = app.localizedName ?? "未知 App"
         let bundleId = app.bundleIdentifier
-        let (windowTitle, tabDesc) = getWindowInfo(pid: pid)
+        let windowInfo = getWindowInfo(pid: pid)
 
         return SourceAppInfo(
             pid: pid,
             bundleIdentifier: bundleId,
             appName: appName,
-            windowTitle: windowTitle,
-            tabDescription: tabDesc
+            windowTitle: windowInfo.windowTitle,
+            tabDescription: windowInfo.tabDescription,
+            tabIndex: windowInfo.tabIndex
         )
     }
 
-    /// 透過 Accessibility API 取得焦點視窗標題和選中分頁描述
-    private static func getWindowInfo(pid: pid_t) -> (windowTitle: String, tabDescription: String) {
+    /// 透過 Accessibility API 取得焦點視窗標題、選中分頁描述和索引
+    private static func getWindowInfo(pid: pid_t) -> (windowTitle: String, tabDescription: String, tabIndex: Int) {
         let appElement = AXUIElementCreateApplication(pid)
 
         // 取得焦點視窗
@@ -88,7 +95,7 @@ struct SourceAppInfo {
         )
 
         guard result == .success, let window = focusedWindow else {
-            return ("", "")
+            return ("", "", -1)
         }
 
         let axWindow = window as! AXUIElement
@@ -98,20 +105,20 @@ struct SourceAppInfo {
         AXUIElementCopyAttributeValue(axWindow, kAXTitleAttribute as CFString, &titleValue)
         let windowTitle = titleValue as? String ?? ""
 
-        // 嘗試取得選中分頁的描述
-        let tabDesc = getSelectedTabDescription(window: axWindow)
+        // 嘗試取得選中分頁的描述和索引
+        let (tabDesc, tabIdx) = getSelectedTabInfo(window: axWindow)
 
-        return (windowTitle, tabDesc)
+        return (windowTitle, tabDesc, tabIdx)
     }
 
-    /// 從視窗的 AXTabGroup 中找到選中的分頁，回傳其 AXDescription
-    private static func getSelectedTabDescription(window: AXUIElement) -> String {
+    /// 從視窗的 AXTabGroup 中找到選中的分頁，回傳其 AXDescription 和索引
+    private static func getSelectedTabInfo(window: AXUIElement) -> (description: String, index: Int) {
         // 取得視窗的子元素
         var children: AnyObject?
         AXUIElementCopyAttributeValue(window, kAXChildrenAttribute as CFString, &children)
 
         guard let kids = children as? [AXUIElement] else {
-            return ""
+            return ("", -1)
         }
 
         // 找到 AXTabGroup
@@ -131,6 +138,7 @@ struct SourceAppInfo {
                 continue
             }
 
+            var tabIndex = 0
             for tab in tabs {
                 // 檢查是否為 AXRadioButton（分頁）
                 var tabRole: AnyObject?
@@ -147,11 +155,13 @@ struct SourceAppInfo {
                     // 取得分頁描述
                     var desc: AnyObject?
                     AXUIElementCopyAttributeValue(tab, kAXDescriptionAttribute as CFString, &desc)
-                    return desc as? String ?? ""
+                    return (desc as? String ?? "", tabIndex)
                 }
+
+                tabIndex += 1
             }
         }
 
-        return ""
+        return ("", -1)
     }
 }
