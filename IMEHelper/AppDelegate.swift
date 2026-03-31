@@ -224,10 +224,23 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
         // 隱藏所有可見的 InputPanel
         windowManager.hideAll()
 
-        // 清理已關閉的 app 的綁定，並 close 對應的 panel 釋放資源
+        // 清理已關閉的 app 的綁定
         let cleanedPanels = windowManager.cleanupTerminatedApps()
         for panel in cleanedPanels {
-            panel.hidePanel()
+            let hasText = !panel.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            if hasText {
+                // 有未送出的文字，顯示提示讓使用者手動複製
+                NSApp.activate(ignoringOtherApps: true)
+                panel.makeKeyAndOrderFront(nil)
+                let alert = NSAlert()
+                alert.messageText = "目標視窗已關閉"
+                alert.informativeText = "「\(panel.sourceAppInfo?.appName ?? "目標 app")」已關閉。\n輸入窗口中的文字已保留，你可以手動複製後關閉。"
+                alert.alertStyle = .warning
+                alert.addButton(withTitle: "確定")
+                alert.beginSheetModal(for: panel, completionHandler: nil)
+            } else {
+                panel.hidePanel()
+            }
         }
 
         // 延遲取得視窗標題，嘗試自動恢復
@@ -366,8 +379,18 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
                 panel.hidePanel()
                 NSLog("AppDelegate: 文字回填完成")
             } else {
-                // 目標已關閉，保留文字讓使用者可以手動複製
-                NSLog("AppDelegate: 回填失敗，目標 app 已關閉，文字已保留")
+                // 回填失敗，重新顯示 panel 讓使用者可以手動複製
+                NSApp.activate(ignoringOtherApps: true)
+                panel.makeKeyAndOrderFront(nil)
+                panel.focusTextView()
+
+                let alert = NSAlert()
+                alert.messageText = "回填失敗"
+                alert.informativeText = "目標 app 已關閉，無法回填文字。\n文字已保留在輸入窗口中，你可以手動複製。"
+                alert.alertStyle = .warning
+                alert.addButton(withTitle: "確定")
+                alert.beginSheetModal(for: panel, completionHandler: nil)
+                NSLog("AppDelegate: 回填失敗，已重新顯示 panel")
             }
 
             if let current = SourceAppInfo.fromFrontmostApp() {
