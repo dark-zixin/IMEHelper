@@ -44,9 +44,12 @@ class InputPanel: NSPanel {
     weak var panelDelegate: InputPanelDelegate?
 
     /// 初始化浮動輸入窗口
+    /// 窗口最大自動展開高度
+    private let maxAutoHeight: CGFloat = 400
+
     init() {
         super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 400, height: 200),
+            contentRect: NSRect(x: 0, y: 0, width: 500, height: 80),
             styleMask: [.titled, .closable, .resizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
@@ -61,7 +64,7 @@ class InputPanel: NSPanel {
         self.title = "IMEHelper 輸入面板"
 
         // 設定最小尺寸
-        self.minSize = NSSize(width: 300, height: 150)
+        self.minSize = NSSize(width: 300, height: 60)
 
         // 設定自己為 NSWindowDelegate 以攔截關閉事件
         self.delegate = self
@@ -83,6 +86,22 @@ class InputPanel: NSPanel {
             self,
             selector: #selector(windowAlphaDidChange(_:)),
             name: SettingsManager.windowAlphaDidChangeNotification,
+            object: nil
+        )
+
+        // 監聽字型大小變更
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(fontSizeDidChange(_:)),
+            name: SettingsManager.fontSizeDidChangeNotification,
+            object: nil
+        )
+
+        // 監聽文字變動，自動調整窗口高度
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(textDidChangeNotification(_:)),
+            name: NSText.didChangeNotification,
             object: nil
         )
     }
@@ -125,7 +144,7 @@ class InputPanel: NSPanel {
         textView.isSelectable = true
         textView.isRichText = false  // 純文字模式
         textView.drawsBackground = false  // 透明背景
-        textView.font = NSFont.systemFont(ofSize: 14)
+        textView.font = NSFont.systemFont(ofSize: SettingsManager.shared.fontSize)
         textView.textColor = NSColor.labelColor
         textView.isAutomaticQuoteSubstitutionEnabled = false
         textView.isAutomaticDashSubstitutionEnabled = false
@@ -328,6 +347,49 @@ class InputPanel: NSPanel {
     /// 透明度變更通知處理 — 即時更新窗口透明度
     @objc private func windowAlphaDidChange(_ notification: Notification) {
         visualEffectView.alphaValue = SettingsManager.shared.windowAlpha
+    }
+
+    /// 字型大小變更通知處理 — 即時更新文字大小
+    @objc private func fontSizeDidChange(_ notification: Notification) {
+        textView.font = NSFont.systemFont(ofSize: SettingsManager.shared.fontSize)
+        adjustWindowHeight()
+    }
+
+    /// 文字變動通知處理 — 自動調整窗口高度
+    @objc private func textDidChangeNotification(_ notification: Notification) {
+        adjustWindowHeight()
+    }
+
+    /// 根據文字內容自動調整窗口高度
+    private func adjustWindowHeight() {
+        guard let layoutManager = textView.layoutManager,
+              let textContainer = textView.textContainer else {
+            return
+        }
+
+        // 計算文字所需高度
+        layoutManager.ensureLayout(for: textContainer)
+        let textHeight = layoutManager.usedRect(for: textContainer).height
+
+        // 加上內邊距和標題列高度
+        let padding = textView.textContainerInset.height * 2 + 16  // 上下內邊距
+        let titleBarHeight: CGFloat = 28
+        let hintHeight: CGFloat = 20
+        let targetHeight = textHeight + padding + titleBarHeight + hintHeight
+
+        // 限制在最小高度和最大高度之間
+        let minHeight: CGFloat = 80
+        let newHeight = min(max(targetHeight, minHeight), maxAutoHeight)
+
+        // 只有高度變化時才調整
+        let currentHeight = self.frame.height
+        if abs(newHeight - currentHeight) > 2 {
+            var frame = self.frame
+            // 從底部往上長（保持底部位置不變）
+            frame.origin.y -= (newHeight - frame.height)
+            frame.size.height = newHeight
+            self.setFrame(frame, display: true, animate: false)
+        }
     }
 
     /// 顯示底部提示標籤

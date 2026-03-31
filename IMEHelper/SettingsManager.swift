@@ -28,12 +28,16 @@ class SettingsManager {
         static let lastWindowX = "lastWindowX"
         static let lastWindowY = "lastWindowY"
         static let windowAlpha = "windowAlpha"
+        static let fontSize = "fontSize"
     }
 
     // MARK: - 設定變更通知
 
     /// 窗口透明度變更通知
     static let windowAlphaDidChangeNotification = Notification.Name("SettingsManager.windowAlphaDidChange")
+
+    /// 字型大小變更通知
+    static let fontSizeDidChangeNotification = Notification.Name("SettingsManager.fontSizeDidChange")
 
     /// 取得/設定窗口位置模式
     var windowPositionMode: WindowPositionMode {
@@ -62,6 +66,19 @@ class SettingsManager {
                 defaults.removeObject(forKey: Keys.lastWindowX)
                 defaults.removeObject(forKey: Keys.lastWindowY)
             }
+        }
+    }
+
+    /// 取得/設定文字大小 (12-36)
+    var fontSize: CGFloat {
+        get {
+            let value = defaults.double(forKey: Keys.fontSize)
+            return value > 0 ? CGFloat(value) : 14  // 預設 14
+        }
+        set {
+            let clamped = min(max(Double(newValue), 12), 36)
+            defaults.set(clamped, forKey: Keys.fontSize)
+            NotificationCenter.default.post(name: Self.fontSizeDidChangeNotification, object: nil)
         }
     }
 
