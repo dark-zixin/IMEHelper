@@ -48,18 +48,22 @@ class WindowManager {
     var allBindings: [WindowBinding] { bindings }
 
     /// 移除 PID 已不存在的綁定（清理已關閉的 app）
-    func cleanupTerminatedApps() {
+    /// - Returns: 被清理的 panel 列表，由呼叫端負責 close
+    @discardableResult
+    func cleanupTerminatedApps() -> [InputPanel] {
+        var cleanedPanels: [InputPanel] = []
         bindings.removeAll { binding in
             guard let app = NSRunningApplication(processIdentifier: binding.pid) else {
                 // 無法取得 app 資訊，代表已終止
-                binding.panel.orderOut(nil)
+                cleanedPanels.append(binding.panel)
                 return true
             }
             if app.isTerminated {
-                binding.panel.orderOut(nil)
+                cleanedPanels.append(binding.panel)
                 return true
             }
             return false
         }
+        return cleanedPanels
     }
 }

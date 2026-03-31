@@ -37,6 +37,12 @@ class InputPanel: NSPanel {
     /// 提示標籤自動隱藏的計時器
     private var hintTimer: Timer?
 
+    /// 是否為程式主動關閉（跳過 windowShouldClose 確認對話框）
+    private var isClosingProgrammatically = false
+
+    /// 是否為程式主動移動（不記錄到 rememberLast）
+    private var isProgrammaticMove = false
+
     /// 來源 app 資訊
     private(set) var sourceAppInfo: SourceAppInfo?
 
@@ -111,6 +117,14 @@ class InputPanel: NSPanel {
 
     deinit {
         NotificationCenter.default.removeObserver(self)
+    }
+
+    /// 覆寫 close() 確保清理 NotificationCenter observer
+    override func close() {
+        NotificationCenter.default.removeObserver(self)
+        hintTimer?.invalidate()
+        hintTimer = nil
+        super.close()
     }
 
     // MARK: - UI 建構
@@ -232,6 +246,7 @@ class InputPanel: NSPanel {
     func showAt(caretPosition: NSPoint?, caretHeight: CGFloat) {
         let settings = SettingsManager.shared
 
+        isProgrammaticMove = true
         switch settings.windowPositionMode {
         case .followCaret:
             // 跟著文字游標（原有邏輯）
@@ -250,6 +265,7 @@ class InputPanel: NSPanel {
                 positionAtCaret(caretPosition: caretPosition, caretHeight: caretHeight)
             }
         }
+        isProgrammaticMove = false
 
         // 顯示窗口並取得焦點
         NSLog("InputPanel: 準備顯示窗口，位置 x=\(self.frame.origin.x), y=\(self.frame.origin.y)")
@@ -275,6 +291,12 @@ class InputPanel: NSPanel {
         self.orderOut(nil)
 
         panelDelegate?.inputPanelDidClose(self)
+    }
+
+    /// 程式主動關閉窗口（不觸發 windowShouldClose 確認對話框）
+    func closeProgrammatically() {
+        isClosingProgrammatically = true
+        self.close()
     }
 
     /// 重置 ESC 狀態機（文字變動時呼叫）
@@ -347,7 +369,10 @@ class InputPanel: NSPanel {
     }
 
     /// 窗口移動通知處理 — 記錄位置到 SettingsManager
+    /// 只有使用者手動拖動時才記錄，程式主動定位不記錄
     @objc private func windowDidMoveNotification(_ notification: Notification) {
+        guard !isProgrammaticMove else { return }
+        guard SettingsManager.shared.windowPositionMode == .rememberLast else { return }
         SettingsManager.shared.lastWindowPosition = self.frame.origin
     }
 
@@ -399,10 +424,11 @@ class InputPanel: NSPanel {
         let currentHeight = self.frame.height
         if abs(newHeight - currentHeight) > 2 {
             var frame = self.frame
-            // 從底部往上長（保持底部位置不變）
-            frame.origin.y -= (newHeight - frame.height)
+            // 保持底部位置不變，往上長（AppKit 座標系 origin 是左下角，不需要調整 origin.y）
             frame.size.height = newHeight
+            isProgrammaticMove = true
             self.setFrame(frame, display: true, animate: false)
+            isProgrammaticMove = false
         }
     }
 
@@ -486,6 +512,12 @@ extension InputPanel: InputTextViewDelegate {
 extension InputPanel: NSWindowDelegate {
 
     func windowShouldClose(_ sender: NSWindow) -> Bool {
+        // 程式主動關閉時，跳過確認對話框
+        if isClosingProgrammatically {
+            panelDelegate?.inputPanelDidClose(self)
+            return true
+        }
+
         let hasText = !textView.string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
 
         guard hasText else {

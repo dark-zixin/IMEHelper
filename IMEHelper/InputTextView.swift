@@ -25,8 +25,14 @@ class InputTextView: NSTextView {
         let keyCode = event.keyCode
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
 
-        // Cmd 組合鍵：讓標準編輯操作正常運作（複製、貼上、剪下、全選、復原）
-        if flags.contains(.command) {
+        // 精確匹配修飾鍵，避免 Cmd+Shift+Z 被當成 Cmd+Z
+        let hasCommand = flags.contains(.command)
+        let hasShift = flags.contains(.shift)
+        let hasOption = flags.contains(.option)
+        let hasControl = flags.contains(.control)
+
+        // 純 Cmd 組合鍵（不含 Shift、Option、Control）
+        if hasCommand && !hasShift && !hasOption && !hasControl {
             switch keyCode {
             case 8:  // Cmd+C 複製
                 self.copy(nil)
@@ -50,6 +56,17 @@ class InputTextView: NSTextView {
             case 27:  // Cmd+- 縮小文字
                 let current = SettingsManager.shared.fontSize
                 SettingsManager.shared.fontSize = max(current - 2, 12)
+                return
+            default:
+                break
+            }
+        }
+
+        // Cmd+Shift 組合鍵
+        if hasCommand && hasShift && !hasOption && !hasControl {
+            switch keyCode {
+            case 6:  // Cmd+Shift+Z 重做
+                self.undoManager?.redo()
                 return
             default:
                 break

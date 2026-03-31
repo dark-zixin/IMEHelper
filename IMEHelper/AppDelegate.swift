@@ -201,8 +201,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
         // 隱藏所有可見的 InputPanel
         windowManager.hideAll()
 
-        // 清理已關閉的 app 的綁定
-        windowManager.cleanupTerminatedApps()
+        // 清理已關閉的 app 的綁定，並 close 對應的 panel 釋放資源
+        let cleanedPanels = windowManager.cleanupTerminatedApps()
+        for panel in cleanedPanels {
+            panel.closeProgrammatically()
+        }
 
         // 延遲取得視窗標題，嘗試自動恢復
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
@@ -330,15 +333,23 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
         panel.resetEscState()
 
         // 用 TextInjector 回填文字
-        textInjector.inject(text: text, targetPID: sourceInfo.pid) { [weak self] in
+        textInjector.inject(text: text, targetPID: sourceInfo.pid) { [weak self] success in
             guard let self = self else { return }
-            // 回填完成，清空文字
-            panel.text = ""
             self.isInjecting = false
+
+            if success {
+                // 回填成功，清空文字並關閉 panel
+                panel.text = ""
+                panel.closeProgrammatically()
+                NSLog("AppDelegate: 文字回填完成")
+            } else {
+                // 目標已關閉，保留文字讓使用者可以手動複製
+                NSLog("AppDelegate: 回填失敗，目標 app 已關閉，文字已保留")
+            }
+
             if let current = SourceAppInfo.fromFrontmostApp() {
                 self.lastFrontmostKey = current.bindingKey
             }
-            NSLog("AppDelegate: 文字回填完成")
         }
     }
 
@@ -351,6 +362,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
            let app = NSRunningApplication(processIdentifier: info.pid),
            !app.isTerminated {
             app.activate(options: [])
+        }
+        // 確保 panel 被 close 釋放資源（如果尚未 close）
+        if panel.isVisible {
+            panel.closeProgrammatically()
         }
     }
 

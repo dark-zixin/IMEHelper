@@ -17,8 +17,8 @@ class TextInjector {
     /// - Parameters:
     ///   - text: 要回填的文字
     ///   - targetPID: 目標 app 的 PID
-    ///   - completion: 完成後的 callback
-    func inject(text: String, targetPID: pid_t, completion: @escaping () -> Void) {
+    ///   - completion: 完成後的 callback，Bool 參數表示是否成功回填
+    func inject(text: String, targetPID: pid_t, completion: @escaping (Bool) -> Void) {
         // 1. 備份剪貼簿
         pasteboardHelper.backup()
 
@@ -30,7 +30,7 @@ class TextInjector {
               !app.isTerminated else {
             NSLog("TextInjector: 目標 app (PID: \(targetPID)) 已關閉，還原剪貼簿")
             pasteboardHelper.restore()
-            completion()
+            completion(false)
             return
         }
 
@@ -45,7 +45,7 @@ class TextInjector {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                 self.pasteboardHelper.restore()
                 NSLog("TextInjector: 文字回填完成，剪貼簿已還原")
-                completion()
+                completion(true)
             }
         }
     }
