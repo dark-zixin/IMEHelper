@@ -18,8 +18,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
     // 全域快捷鍵管理器
     private var hotkeyManager: HotkeyManager!
 
-    // 浮動輸入窗口（Phase 5 才做多窗口，目前只用一個）
-    private var inputPanel: InputPanel?
+    // 多窗口管理器
+    private var windowManager = WindowManager()
 
     // 文字回填注入器
     private var textInjector = TextInjector()
@@ -33,6 +33,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
 
         // 設定全域快捷鍵
         setupHotkeyManager()
+
+        // 監聽 app 切換通知
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self,
+            selector: #selector(activeAppDidChange(_:)),
+            name: NSWorkspace.didActivateApplicationNotification,
+            object: nil
+        )
     }
 
     func applicationWillTerminate(_ aNotification: Notification) {
@@ -125,36 +133,39 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
 
     /// 處理快捷鍵觸發事件
     private func handleHotkeyPressed() {
-        // 如果已有 InputPanel 且正在顯示，則隱藏（toggle 行為）
-        if let panel = inputPanel, panel.isVisible {
-            panel.hidePanel()
-            return
-        }
-
         // 取得來源 app 資訊（在建立 panel 之前，因為 panel 顯示後前景 app 會變成自己）
         let sourceApp = SourceAppInfo.fromFrontmostApp()
 
-        // 取得游標位置
-        let caretInfo = CaretPositionHelper.getCaretPosition()
-
-        // 建立或重用 InputPanel
-        if inputPanel == nil {
-            let panel = InputPanel()
-            panel.panelDelegate = self
-            inputPanel = panel
-        }
-
-        guard let panel = inputPanel else {
+        guard let sourceApp = sourceApp else {
             return
         }
 
-        // 設定來源 app 資訊
-        if let info = sourceApp {
-            panel.setSourceApp(info)
+        // 檢查是否已有對應的窗口
+        if let existingPanel = windowManager.find(for: sourceApp) {
+            if existingPanel.isVisible {
+                // 窗口已顯示 → 隱藏（toggle）
+                existingPanel.orderOut(nil)
+                // 歸還焦點給來源 app
+                if let app = NSRunningApplication(processIdentifier: sourceApp.pid) {
+                    app.activate(options: [])
+                }
+            } else {
+                // 窗口存在但隱藏中 → 重新顯示
+                NSApp.activate(ignoringOtherApps: true)
+                existingPanel.makeKeyAndOrderFront(nil)
+                existingPanel.focusTextView()
+            }
+            return
         }
 
-        // 清空之前的文字
-        panel.text = ""
+        // 沒有對應窗口 → 新建
+        let caretInfo = CaretPositionHelper.getCaretPosition()
+        let panel = InputPanel()
+        panel.panelDelegate = self
+        panel.setSourceApp(sourceApp)
+
+        // 綁定到 WindowManager
+        windowManager.bind(panel: panel, to: sourceApp)
 
         // 背景 app 需要先 activate 才能顯示視窗
         NSApp.activate(ignoringOtherApps: true)
@@ -166,7 +177,30 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
         )
     }
 
-    // MARK: - Accessibility 權限檢查
+    // MARK: - App 切換監聽
+
+    /// 監聽 app 切換事件，隱藏所有可見的 InputPanel
+    @objc private func activeAppDidChange(_ notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let app = userInfo[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else {
+            return
+        }
+
+        // 切換到自己（IMEHelper）不做處理
+        if app.processIdentifier == ProcessInfo.processInfo.processIdentifier {
+            return
+        }
+
+        // 隱藏所有可見的 InputPanel（只用 orderOut，不觸發完整的 hidePanel）
+        for binding in windowManager.allBindings {
+            if binding.panel.isVisible {
+                binding.panel.orderOut(nil)
+            }
+        }
+
+        // 清理已關閉的 app 的綁定
+        windowManager.cleanupTerminatedApps()
+    }
 
     // MARK: - InputPanelDelegate
 
@@ -188,13 +222,22 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
             // 回填完成後清理窗口狀態
             panel.text = ""
             panel.resetEscState()
-            NSLog("AppDelegate: 文字回填完成")
+            // 移除綁定
+            self.windowManager.remove(panel: panel)
+            NSLog("AppDelegate: 文字回填完成，已移除窗口綁定")
         }
     }
 
     func inputPanelDidClose(_ panel: InputPanel) {
         NSLog("AppDelegate: 輸入窗口已關閉")
-        // 清理窗口狀態（目前保留 inputPanel 實例以重用）
+        // 移除窗口綁定
+        windowManager.remove(panel: panel)
+        // 歸還焦點給來源 app
+        if let info = panel.sourceAppInfo,
+           let app = NSRunningApplication(processIdentifier: info.pid),
+           !app.isTerminated {
+            app.activate(options: [])
+        }
     }
 
     // MARK: - Accessibility 權限檢查

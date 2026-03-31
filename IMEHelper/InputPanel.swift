@@ -245,20 +245,19 @@ class InputPanel: NSPanel {
         NSLog("InputPanel: 窗口已顯示")
     }
 
+    /// 讓 textView 取得焦點（供外部呼叫）
+    func focusTextView() {
+        self.makeFirstResponder(textView)
+    }
+
     /// 隱藏窗口
+    /// 注意：不再負責 activate 來源 app，改由 AppDelegate 統一處理焦點歸還
     func hidePanel() {
         hintTimer?.invalidate()
         hintTimer = nil
         escStateMachine.reset()
         hideHintLabel()
         self.orderOut(nil)
-
-        // 將焦點還給來源 app
-        if let info = sourceAppInfo,
-           let app = NSRunningApplication(processIdentifier: info.pid),
-           app.isTerminated == false {
-            app.activate(options: [])
-        }
 
         panelDelegate?.inputPanelDidClose(self)
     }
