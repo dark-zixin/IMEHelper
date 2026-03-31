@@ -38,7 +38,8 @@ class InputPanel: NSPanel {
     private var hintTimer: Timer?
 
     /// 是否為程式主動關閉（跳過 windowShouldClose 確認對話框）
-    private var isClosingProgrammatically = false
+    /// 是否為程式主動關閉（跳過 windowShouldClose 確認對話框和 delegate 通知）
+    var isClosingProgrammatically = false
 
     /// 是否為程式主動移動（不記錄到 rememberLast）
     private var isProgrammaticMove = false

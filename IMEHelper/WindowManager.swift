@@ -20,23 +20,38 @@ class WindowManager {
         return bindings.first(where: { $0.bindingKey == sourceApp.bindingKey })?.panel
     }
 
-    /// 含 fallback 的查找（處理 tab bar 消失的情況）
+    /// 含 fallback 的查找
     /// 只在快捷鍵觸發時使用
     func findWithFallback(for sourceApp: SourceAppInfo) -> InputPanel? {
         if let exact = find(for: sourceApp) {
             return exact
         }
 
-        // Fallback：tabDescription 為空（tab bar 隱藏）時用 windowID 匹配唯一候選
-        guard sourceApp.windowID != 0, sourceApp.tabDescription.isEmpty else { return nil }
+        guard sourceApp.windowID != 0 else { return nil }
 
-        let candidates = bindings.filter {
-            $0.pid == sourceApp.pid && $0.windowID == sourceApp.windowID
+        // Fallback 1：同 windowID + 同 tabDescription（處理 loginLine 消失/改變的情況）
+        if !sourceApp.tabDescription.isEmpty {
+            let candidates = bindings.filter {
+                $0.pid == sourceApp.pid &&
+                $0.windowID == sourceApp.windowID &&
+                $0.bindingKey.contains("|tab:\(sourceApp.tabDescription)")
+            }
+            if candidates.count == 1 {
+                return candidates[0].panel
+            }
         }
 
-        guard candidates.count == 1 else { return nil }
+        // Fallback 2：同 windowID 唯一候選（處理 tab bar 消失的情況）
+        if sourceApp.tabDescription.isEmpty {
+            let candidates = bindings.filter {
+                $0.pid == sourceApp.pid && $0.windowID == sourceApp.windowID
+            }
+            if candidates.count == 1 {
+                return candidates[0].panel
+            }
+        }
 
-        return candidates[0].panel
+        return nil
     }
 
     /// 綁定新的 InputPanel 到來源 app
@@ -55,12 +70,25 @@ class WindowManager {
         bindings.removeAll(where: { $0.panel === panel })
     }
 
-    /// 隱藏所有可見的窗口（只用 orderOut，不觸發完整的 hidePanel）
+    /// 隱藏所有可見的窗口
+    /// 空 panel 直接移除 binding 並 close（沒有保留價值），有文字的 orderOut
     func hideAll() {
+        var toClose: [InputPanel] = []
         for binding in bindings {
-            if binding.panel.isVisible && !binding.panel.isOrphaned {
+            guard binding.panel.isVisible, !binding.panel.isOrphaned else { continue }
+
+            let hasText = !binding.panel.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            if hasText {
                 binding.panel.orderOut(nil)
+            } else {
+                toClose.append(binding.panel)
             }
+        }
+        // 空 panel：移除 binding 並直接 close，不走 hidePanel 避免觸發 delegate 焦點回跳
+        for panel in toClose {
+            remove(panel: panel)
+            panel.isClosingProgrammatically = true
+            panel.close()
         }
     }
 
