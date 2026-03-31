@@ -25,6 +25,29 @@ class InputTextView: NSTextView {
         let keyCode = event.keyCode
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
 
+        // Cmd 組合鍵：讓標準編輯操作正常運作（複製、貼上、剪下、全選、復原）
+        if flags.contains(.command) {
+            switch keyCode {
+            case 8:  // Cmd+C 複製
+                self.copy(nil)
+                return
+            case 9:  // Cmd+V 貼上
+                self.paste(nil)
+                return
+            case 7:  // Cmd+X 剪下
+                self.cut(nil)
+                return
+            case 0:  // Cmd+A 全選
+                self.selectAll(nil)
+                return
+            case 6:  // Cmd+Z 復原
+                self.undoManager?.undo()
+                return
+            default:
+                break
+            }
+        }
+
         // Enter 鍵 (keyCode = 36)
         if keyCode == 36 {
             if flags.contains(.shift) {
