@@ -15,20 +15,26 @@ class WindowManager {
     private var bindings: [WindowBinding] = []
 
     /// 根據來源 app 資訊查詢已存在的窗口（精確匹配 bindingKey）
+    /// 精確匹配 bindingKey
     func find(for sourceApp: SourceAppInfo) -> InputPanel? {
+        return bindings.first(where: { $0.bindingKey == sourceApp.bindingKey })?.panel
+    }
+
+    /// 含 fallback 的查找（處理分頁關閉後 tab bar 消失的情況）
+    /// 只在快捷鍵觸發和 tryRestore 時使用
+    func findWithFallback(for sourceApp: SourceAppInfo) -> InputPanel? {
         // 精確匹配
-        if let exact = bindings.first(where: { $0.bindingKey == sourceApp.bindingKey }) {
-            return exact.panel
+        if let exact = find(for: sourceApp) {
+            return exact
         }
 
-        // Fallback：同 pid + windowID 匹配（處理分頁關閉後 tab bar 消失的情況）
+        // Fallback：同 pid + windowID 匹配
         guard sourceApp.windowID != 0 else { return nil }
 
         let candidates = bindings.filter {
             $0.pid == sourceApp.pid && $0.windowID == sourceApp.windowID
         }
 
-        // 只有唯一匹配時才使用
         guard candidates.count == 1 else { return nil }
 
         return candidates[0].panel

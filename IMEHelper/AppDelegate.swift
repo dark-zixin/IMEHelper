@@ -168,8 +168,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
             return
         }
 
-        // 檢查是否已有對應的窗口
-        if let existingPanel = windowManager.find(for: sourceApp) {
+        // 檢查是否已有對應的窗口（含 fallback 匹配）
+        if let existingPanel = windowManager.findWithFallback(for: sourceApp) {
             existingPanel.setSourceApp(sourceApp)
 
             if existingPanel.isVisible {
@@ -321,8 +321,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
         // 更新追蹤 key
         lastFrontmostKey = sourceApp.bindingKey
 
-        // 檢查是否有對應的窗口且有內容，且不是被手動隱藏的
-        if let existingPanel = windowManager.find(for: sourceApp),
+        // 檢查是否有對應的窗口且有內容，且不是被手動隱藏的（含 fallback 匹配）
+        if let existingPanel = windowManager.findWithFallback(for: sourceApp),
            !existingPanel.text.isEmpty,
            !existingPanel.isManuallyHidden {
             existingPanel.setSourceApp(sourceApp)
