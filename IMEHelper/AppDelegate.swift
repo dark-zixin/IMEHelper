@@ -258,7 +258,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
         }
     }
 
-    /// 檢查前景視窗標題是否變化，觸發隱藏/恢復
+    /// 檢查前景視窗標題是否變化，觸發隱藏/恢復；同時檢查視窗是否還存在
     private func checkWindowTitleChange() {
         // 正在回填中或自己是前景 app，不做處理
         guard !isInjecting,
@@ -266,6 +266,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
               frontApp.processIdentifier != ProcessInfo.processInfo.processIdentifier else {
             return
         }
+
+        // 檢查已關閉的視窗
+        handleClosedWindows()
 
         // 取得當前前景視窗資訊
         guard let sourceApp = SourceAppInfo.fromFrontmostApp() else {
@@ -290,6 +293,26 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
     }
 
     /// 嘗試恢復前景視窗對應的 InputPanel
+    /// 處理已關閉視窗的 panel（有文字則提示，無文字則靜默關閉）
+    private func handleClosedWindows() {
+        let closedPanels = windowManager.cleanupClosedWindows()
+        for panel in closedPanels {
+            let hasText = !panel.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            if hasText {
+                NSApp.activate(ignoringOtherApps: true)
+                panel.makeKeyAndOrderFront(nil)
+                let alert = NSAlert()
+                alert.messageText = "目標視窗已關閉"
+                alert.informativeText = "原始目標視窗已不存在。\n文字已保留在輸入窗口中，你可以手動複製。"
+                alert.alertStyle = .warning
+                alert.addButton(withTitle: "確定")
+                alert.beginSheetModal(for: panel, completionHandler: nil)
+            } else {
+                panel.hidePanel()
+            }
+        }
+    }
+
     private func tryRestorePanel() {
         // 正在回填中，不恢復
         guard !isInjecting else { return }

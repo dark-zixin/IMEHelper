@@ -13,6 +13,8 @@ struct WindowBinding {
     let bindingKey: String
     /// 來源 app 的 PID
     let pid: pid_t
+    /// 來源視窗的 CGWindowID
+    let windowID: CGWindowID
     /// 對應的 InputPanel
     let panel: InputPanel
 }

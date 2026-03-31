@@ -24,6 +24,7 @@ class WindowManager {
         let binding = WindowBinding(
             bindingKey: sourceApp.bindingKey,
             pid: sourceApp.pid,
+            windowID: sourceApp.windowID,
             panel: panel
         )
         bindings.append(binding)
@@ -48,17 +49,46 @@ class WindowManager {
     var allBindings: [WindowBinding] { bindings }
 
     /// 移除 PID 已不存在的綁定（清理已關閉的 app）
-    /// - Returns: 被清理的 panel 列表，由呼叫端負責 close
+    /// - Returns: 被清理的 panel 列表，由呼叫端負責處理
     @discardableResult
     func cleanupTerminatedApps() -> [InputPanel] {
         var cleanedPanels: [InputPanel] = []
         bindings.removeAll { binding in
             guard let app = NSRunningApplication(processIdentifier: binding.pid) else {
-                // 無法取得 app 資訊，代表已終止
                 cleanedPanels.append(binding.panel)
                 return true
             }
             if app.isTerminated {
+                cleanedPanels.append(binding.panel)
+                return true
+            }
+            return false
+        }
+        return cleanedPanels
+    }
+
+    /// 檢查所有綁定的視窗是否還存在（透過 CGWindowID 驗證）
+    /// - Returns: 視窗已消失的 panel 列表，由呼叫端負責處理
+    @discardableResult
+    func cleanupClosedWindows() -> [InputPanel] {
+        // 取得目前所有 onscreen 的視窗 ID
+        guard let windowInfoList = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] else {
+            return []
+        }
+
+        var activeWindowIDs = Set<CGWindowID>()
+        for info in windowInfoList {
+            if let wid = info[kCGWindowNumber as String] as? CGWindowID {
+                activeWindowIDs.insert(wid)
+            }
+        }
+
+        var cleanedPanels: [InputPanel] = []
+        bindings.removeAll { binding in
+            // windowID 為 0 代表無法取得，跳過不檢查
+            guard binding.windowID != 0 else { return false }
+
+            if !activeWindowIDs.contains(binding.windowID) {
                 cleanedPanels.append(binding.panel)
                 return true
             }
