@@ -121,17 +121,43 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
             return
         }
 
+        // 如果前景 app 是 IMEHelper 自己，toggle 可見的 panel
+        if sourceApp.pid == ProcessInfo.processInfo.processIdentifier {
+            // 找到任何可見的 panel 並隱藏它
+            var didHide = false
+            for binding in windowManager.allBindings {
+                if binding.panel.isVisible {
+                    binding.panel.orderOut(nil)
+                    binding.panel.isManuallyHidden = true
+                    didHide = true
+                    // 歸還焦點給該 panel 的來源 app
+                    if let info = binding.panel.sourceAppInfo,
+                       let app = NSRunningApplication(processIdentifier: info.pid),
+                       !app.isTerminated {
+                        app.activate(options: [])
+                    }
+                }
+            }
+            if didHide {
+                return
+            }
+            // 沒有可見的 panel，不做事
+            return
+        }
+
         // 檢查是否已有對應的窗口
         if let existingPanel = windowManager.find(for: sourceApp) {
             if existingPanel.isVisible {
                 // 窗口已顯示 → 隱藏（toggle）
                 existingPanel.orderOut(nil)
+                existingPanel.isManuallyHidden = true
                 // 歸還焦點給來源 app
                 if let app = NSRunningApplication(processIdentifier: sourceApp.pid) {
                     app.activate(options: [])
                 }
             } else {
                 // 窗口存在但隱藏中 → 重新顯示
+                existingPanel.isManuallyHidden = false
                 NSApp.activate(ignoringOtherApps: true)
                 existingPanel.makeKeyAndOrderFront(nil)
                 existingPanel.focusTextView()
@@ -242,9 +268,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
         // 更新追蹤 key
         lastFrontmostKey = "\(sourceApp.pid)_\(sourceApp.windowTitle)"
 
-        // 檢查是否有對應的窗口且有內容
+        // 檢查是否有對應的窗口且有內容，且不是被手動隱藏的
         if let existingPanel = windowManager.find(for: sourceApp),
-           !existingPanel.text.isEmpty {
+           !existingPanel.text.isEmpty,
+           !existingPanel.isManuallyHidden {
             NSApp.activate(ignoringOtherApps: true)
             existingPanel.makeKeyAndOrderFront(nil)
             existingPanel.focusTextView()
@@ -273,6 +300,22 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
             alert.addButton(withTitle: "確定")
             alert.runModal()
             return
+        }
+
+        // 驗證目標視窗標題是否一致（防止來源視窗關閉但 app 仍在的情況）
+        if !sourceInfo.windowTitle.isEmpty,
+           let currentSourceApp = SourceAppInfo.fromApp(pid: sourceInfo.pid),
+           currentSourceApp.windowTitle != sourceInfo.windowTitle {
+            let alert = NSAlert()
+            alert.messageText = "目標視窗可能已變更"
+            alert.informativeText = "原始目標視窗「\(sourceInfo.windowTitle)」已不是目前的前景視窗。\n目前視窗為「\(currentSourceApp.windowTitle)」。\n\n是否仍要送出文字？"
+            alert.alertStyle = .warning
+            alert.addButton(withTitle: "送出")
+            alert.addButton(withTitle: "取消")
+            let response = alert.runModal()
+            if response != .alertFirstButtonReturn {
+                return
+            }
         }
 
         // 設定回填旗標，抑制自動恢復

@@ -47,6 +47,27 @@ struct SourceAppInfo {
         )
     }
 
+    /// 從指定 PID 的 app 取得資訊（用於驗證視窗是否仍存在）
+    /// - Parameter pid: app 的 process ID
+    /// - Returns: 來源 app 資訊，若 app 已終止則回傳 nil
+    static func fromApp(pid: pid_t) -> SourceAppInfo? {
+        guard let app = NSRunningApplication(processIdentifier: pid),
+              !app.isTerminated else {
+            return nil
+        }
+
+        let appName = app.localizedName ?? "未知 App"
+        let bundleId = app.bundleIdentifier
+        let windowTitle = getWindowTitle(pid: pid)
+
+        return SourceAppInfo(
+            pid: pid,
+            bundleIdentifier: bundleId,
+            appName: appName,
+            windowTitle: windowTitle
+        )
+    }
+
     /// 透過 Accessibility API 取得指定 app 的焦點視窗標題
     /// - Parameter pid: app 的 process ID
     /// - Returns: 視窗標題，若無法取得則回傳空字串

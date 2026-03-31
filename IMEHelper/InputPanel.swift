@@ -40,6 +40,9 @@ class InputPanel: NSPanel {
     /// 來源 app 資訊
     private(set) var sourceAppInfo: SourceAppInfo?
 
+    /// 是否被使用者手動隱藏（快捷鍵 toggle off）
+    var isManuallyHidden: Bool = false
+
     /// 事件委派
     weak var panelDelegate: InputPanelDelegate?
 
@@ -359,9 +362,16 @@ class InputPanel: NSPanel {
         adjustWindowHeight()
     }
 
-    /// 文字變動通知處理 — 自動調整窗口高度
+    /// 文字變動通知處理 — 自動調整窗口高度並重置 ESC 狀態
     @objc private func textDidChangeNotification(_ notification: Notification) {
+        // 確認是自己的 textView 發出的通知
+        guard let notifObject = notification.object as? NSTextView,
+              notifObject === textView else {
+            return
+        }
         adjustWindowHeight()
+        escStateMachine.reset()
+        hideHintLabel()
     }
 
     /// 根據文字內容自動調整窗口高度
@@ -437,16 +447,17 @@ class InputPanel: NSPanel {
 extension InputPanel: InputTextViewDelegate {
 
     func inputTextViewDidPressEnter(_ textView: InputTextView) {
-        let content = textView.string.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = textView.string.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        guard !content.isEmpty else {
+        guard !trimmed.isEmpty else {
             // 空文字按 Enter 直接關閉窗口
             hidePanel()
             return
         }
 
-        NSLog("InputPanel: 使用者送出文字，長度 \(content.count)")
-        panelDelegate?.inputPanelDidSubmit(self, text: content)
+        // 傳原始文字，不是 trim 過的
+        NSLog("InputPanel: 使用者送出文字，長度 \(textView.string.count)")
+        panelDelegate?.inputPanelDidSubmit(self, text: textView.string)
     }
 
     func inputTextViewDidPressEscape(_ textView: InputTextView) {

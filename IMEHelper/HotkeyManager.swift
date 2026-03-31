@@ -109,12 +109,12 @@ private func hotkeyEventCallback(
                 NSLog("HotkeyManager: 事件 tap 被停用，已重新啟用")
             }
         }
-        return Unmanaged.passRetained(event)
+        return Unmanaged.passUnretained(event)
     }
 
     // 只處理按鍵按下事件
     guard type == .keyDown else {
-        return Unmanaged.passRetained(event)
+        return Unmanaged.passUnretained(event)
     }
 
     // 檢查修飾鍵：Cmd + Shift（不含其他修飾鍵）
@@ -124,13 +124,13 @@ private func hotkeyEventCallback(
     let hasExtra = flags.contains(.maskControl) || flags.contains(.maskAlternate)
 
     guard hasRequired && !hasExtra else {
-        return Unmanaged.passRetained(event)
+        return Unmanaged.passUnretained(event)
     }
 
     // 檢查按鍵是否為 Space（keyCode = 49）
     let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
     guard keyCode == 49 else {
-        return Unmanaged.passRetained(event)
+        return Unmanaged.passUnretained(event)
     }
 
     // 觸發快捷鍵 callback
