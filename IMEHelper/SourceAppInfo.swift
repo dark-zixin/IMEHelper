@@ -164,12 +164,13 @@ struct SourceAppInfo {
             return 0
         }
 
-        // 第一輪：標題 + 位置 + 大小 完全比對（最精確）
+        // 第一輪：onscreen + 標題 + 位置 + 大小 完全比對（最精確）
         for info in windowInfoList {
             guard let ownerPID = info[kCGWindowOwnerPID as String] as? pid_t,
                   ownerPID == pid,
                   let layer = info[kCGWindowLayer as String] as? Int,
-                  layer == 0 else {
+                  layer == 0,
+                  info[kCGWindowIsOnscreen as String] as? Bool == true else {
                 continue
             }
 
@@ -188,12 +189,13 @@ struct SourceAppInfo {
             }
         }
 
-        // 第二輪：位置 + 大小（標題可能已變動）
+        // 第二輪：onscreen + 位置 + 大小（標題可能已變動）
         for info in windowInfoList {
             guard let ownerPID = info[kCGWindowOwnerPID as String] as? pid_t,
                   ownerPID == pid,
                   let layer = info[kCGWindowLayer as String] as? Int,
-                  layer == 0 else {
+                  layer == 0,
+                  info[kCGWindowIsOnscreen as String] as? Bool == true else {
                 continue
             }
 
