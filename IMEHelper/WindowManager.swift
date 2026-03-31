@@ -14,9 +14,40 @@ class WindowManager {
     /// 所有的窗口綁定
     private var bindings: [WindowBinding] = []
 
-    /// 根據來源 app 資訊查詢已存在的窗口（精確匹配 bindingKey）
+    /// 根據來源 app 資訊查詢已存在的窗口
     func find(for sourceApp: SourceAppInfo) -> InputPanel? {
-        return bindings.first(where: { $0.bindingKey == sourceApp.bindingKey })?.panel
+        // 精確匹配 bindingKey
+        if let exact = bindings.first(where: { $0.bindingKey == sourceApp.bindingKey }) {
+            return exact.panel
+        }
+
+        // Fallback：同 windowID 內用 tabDescription 匹配（處理分頁關閉後索引位移）
+        guard sourceApp.windowID != 0, !sourceApp.tabDescription.isEmpty else {
+            return nil
+        }
+
+        let candidates = bindings.filter {
+            $0.pid == sourceApp.pid &&
+            $0.windowID == sourceApp.windowID &&
+            $0.bindingKey.contains("tab:\(sourceApp.tabDescription)")
+        }
+
+        // 只有唯一匹配時才使用（避免同描述多分頁的誤配）
+        guard candidates.count == 1 else {
+            return nil
+        }
+
+        // 更新 bindingKey 以反映新的索引
+        if let idx = bindings.firstIndex(where: { $0.panel === candidates[0].panel }) {
+            bindings[idx] = WindowBinding(
+                bindingKey: sourceApp.bindingKey,
+                pid: bindings[idx].pid,
+                windowID: bindings[idx].windowID,
+                panel: bindings[idx].panel
+            )
+        }
+
+        return candidates[0].panel
     }
 
     /// 綁定新的 InputPanel 到來源 app
