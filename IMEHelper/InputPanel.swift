@@ -287,7 +287,6 @@ class InputPanel: NSPanel {
         let panelSize = self.frame.size
 
         guard let caret = caretPosition else {
-            // 沒有游標位置，顯示在螢幕中央
             centerOnScreen()
             return
         }
@@ -303,16 +302,21 @@ class InputPanel: NSPanel {
             return
         }
 
-        let screenFrame = screen.frame
-        let screenMaxY = NSMaxY(screenFrame)
+        let screenFrame = screen.visibleFrame
+        let screenMaxY = NSMaxY(screen.frame)
 
         // 將左上角原點的 y 轉換為左下角原點
-        // 游標下方偏移 4 點
-        let convertedY = screenMaxY - caret.y - caretHeight - 4
-        let panelX = caret.x
-        let panelY = convertedY - panelSize.height
+        let convertedCaretY = screenMaxY - caret.y
 
-        // 確保窗口不超出螢幕邊界
+        // 預設放在游標上方（窗口底部對齊游標上方，留 4 點間距）
+        let panelX = caret.x
+        var panelY = convertedCaretY + 4
+
+        // 上邊界檢查：如果窗口會超出螢幕頂部，改放到游標下方
+        if panelY + panelSize.height > NSMaxY(screenFrame) {
+            panelY = convertedCaretY - caretHeight - panelSize.height - 4
+        }
+
         var finalX = panelX
         var finalY = panelY
 
@@ -326,9 +330,9 @@ class InputPanel: NSPanel {
             finalX = NSMinX(screenFrame) + 8
         }
 
-        // 下邊界檢查：如果窗口會超出螢幕底部，改放到游標上方
+        // 下邊界檢查
         if finalY < NSMinY(screenFrame) {
-            finalY = screenMaxY - caret.y + 4
+            finalY = NSMinY(screenFrame) + 8
         }
 
         self.setFrameOrigin(NSPoint(x: finalX, y: finalY))

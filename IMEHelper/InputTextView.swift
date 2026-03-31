@@ -43,6 +43,14 @@ class InputTextView: NSTextView {
             case 6:  // Cmd+Z 復原
                 self.undoManager?.undo()
                 return
+            case 24:  // Cmd++ (Cmd+=) 放大文字
+                let current = SettingsManager.shared.fontSize
+                SettingsManager.shared.fontSize = min(current + 2, 36)
+                return
+            case 27:  // Cmd+- 縮小文字
+                let current = SettingsManager.shared.fontSize
+                SettingsManager.shared.fontSize = max(current - 2, 12)
+                return
             default:
                 break
             }
