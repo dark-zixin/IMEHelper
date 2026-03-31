@@ -252,6 +252,14 @@ class InputPanel: NSPanel {
         escStateMachine.reset()
         hideHintLabel()
         self.orderOut(nil)
+
+        // 將焦點還給來源 app
+        if let info = sourceAppInfo,
+           let app = NSRunningApplication(processIdentifier: info.pid),
+           app.isTerminated == false {
+            app.activate(options: [])
+        }
+
         panelDelegate?.inputPanelDidClose(self)
     }
 
@@ -312,6 +320,8 @@ extension InputPanel: InputTextViewDelegate {
         let content = textView.string.trimmingCharacters(in: .whitespacesAndNewlines)
 
         guard !content.isEmpty else {
+            // 空文字按 Enter 直接關閉窗口
+            hidePanel()
             return
         }
 
