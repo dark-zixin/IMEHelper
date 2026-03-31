@@ -113,4 +113,40 @@ class WindowManager {
         }
         return cleanedPanels
     }
+
+    /// 檢查同一視窗內的綁定，其分頁是否還存在
+    /// - Parameter currentTabDescriptions: 當前視窗中所有分頁的描述列表
+    /// - Parameter windowID: 要檢查的視窗 CGWindowID
+    @discardableResult
+    func cleanupClosedTabs(windowID: CGWindowID, currentTabDescriptions: [String]) -> [InputPanel] {
+        guard windowID != 0 else { return [] }
+
+        // 統計目前各描述出現的次數
+        var availableCounts: [String: Int] = [:]
+        for desc in currentTabDescriptions where !desc.isEmpty {
+            availableCounts[desc, default: 0] += 1
+        }
+
+        var cleanedPanels: [InputPanel] = []
+        bindings.removeAll { binding in
+            guard binding.windowID == windowID else { return false }
+
+            // 從 bindingKey 提取 tab 描述
+            guard let tabRange = binding.bindingKey.range(of: "|tab:") else { return false }
+            let tabDesc = String(binding.bindingKey[tabRange.upperBound...])
+
+            guard !tabDesc.isEmpty else { return false }
+
+            let count = availableCounts[tabDesc, default: 0]
+            if count > 0 {
+                availableCounts[tabDesc] = count - 1
+                return false  // 分頁還在
+            }
+
+            // 分頁已不存在
+            cleanedPanels.append(binding.panel)
+            return true
+        }
+        return cleanedPanels
+    }
 }
