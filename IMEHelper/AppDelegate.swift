@@ -226,22 +226,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
 
         // 清理已關閉的 app 的綁定
         let cleanedPanels = windowManager.cleanupTerminatedApps()
-        for panel in cleanedPanels {
-            let hasText = !panel.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            if hasText {
-                // 有未送出的文字，顯示提示讓使用者手動複製
-                NSApp.activate(ignoringOtherApps: true)
-                panel.makeKeyAndOrderFront(nil)
-                let alert = NSAlert()
-                alert.messageText = "目標視窗已關閉"
-                alert.informativeText = "「\(panel.sourceAppInfo?.appName ?? "目標 app")」已關閉。\n輸入窗口中的文字已保留，你可以手動複製後關閉。"
-                alert.alertStyle = .warning
-                alert.addButton(withTitle: "確定")
-                alert.beginSheetModal(for: panel, completionHandler: nil)
-            } else {
-                panel.hidePanel()
-            }
-        }
+        handleOrphanedPanels(cleanedPanels)
 
         // 延遲取得視窗標題，嘗試自動恢復
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
@@ -293,20 +278,22 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
     }
 
     /// 嘗試恢復前景視窗對應的 InputPanel
-    /// 處理已關閉視窗的 panel（有文字則提示，無文字則靜默關閉）
+    /// 檢查並處理已關閉視窗的 panel
     private func handleClosedWindows() {
         let closedPanels = windowManager.cleanupClosedWindows()
-        for panel in closedPanels {
+        handleOrphanedPanels(closedPanels)
+    }
+
+    /// 統一處理孤立 panel（目標視窗/app 已關閉）
+    private func handleOrphanedPanels(_ panels: [InputPanel]) {
+        for panel in panels {
             let hasText = !panel.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             if hasText {
+                // 標記為孤立，更新標題列提示，顯示 panel 讓使用者複製
+                panel.markAsOrphaned()
                 NSApp.activate(ignoringOtherApps: true)
                 panel.makeKeyAndOrderFront(nil)
-                let alert = NSAlert()
-                alert.messageText = "目標視窗已關閉"
-                alert.informativeText = "原始目標視窗已不存在。\n文字已保留在輸入窗口中，你可以手動複製。"
-                alert.alertStyle = .warning
-                alert.addButton(withTitle: "確定")
-                alert.beginSheetModal(for: panel, completionHandler: nil)
+                panel.focusTextView()
             } else {
                 panel.hidePanel()
             }
@@ -402,17 +389,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
                 panel.hidePanel()
                 NSLog("AppDelegate: 文字回填完成")
             } else {
-                // 回填失敗，重新顯示 panel 讓使用者可以手動複製
+                // 回填失敗，標記為孤立並重新顯示
+                panel.markAsOrphaned()
                 NSApp.activate(ignoringOtherApps: true)
                 panel.makeKeyAndOrderFront(nil)
                 panel.focusTextView()
-
-                let alert = NSAlert()
-                alert.messageText = "回填失敗"
-                alert.informativeText = "目標 app 已關閉，無法回填文字。\n文字已保留在輸入窗口中，你可以手動複製。"
-                alert.alertStyle = .warning
-                alert.addButton(withTitle: "確定")
-                alert.beginSheetModal(for: panel, completionHandler: nil)
                 NSLog("AppDelegate: 回填失敗，已重新顯示 panel")
             }
 

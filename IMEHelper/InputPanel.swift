@@ -46,6 +46,9 @@ class InputPanel: NSPanel {
     /// 來源 app 資訊
     private(set) var sourceAppInfo: SourceAppInfo?
 
+    /// 是否為孤立狀態（目標視窗已關閉，不受 hideAll 影響）
+    var isOrphaned = false
+
     /// 是否被使用者手動隱藏（快捷鍵 toggle off）
     var isManuallyHidden: Bool = false
 
@@ -217,6 +220,12 @@ class InputPanel: NSPanel {
     }
 
     // MARK: - 公開方法
+
+    /// 標記為孤立狀態（目標視窗已關閉），更新標題列提示
+    func markAsOrphaned() {
+        isOrphaned = true
+        self.title = "⚠ 目標視窗已關閉 — 請手動複製文字後關閉"
+    }
 
     /// 設定來源 app 資訊（更新標題列顯示）
     func setSourceApp(_ info: SourceAppInfo) {
