@@ -325,17 +325,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
         // 先移除綁定，避免回填過程中被自動恢復
         windowManager.remove(panel: panel)
 
-        // 隱藏視窗並清理
+        // 隱藏視窗（但保留文字，等回填成功後才清空）
         panel.orderOut(nil)
-        panel.text = ""
         panel.resetEscState()
 
         // 用 TextInjector 回填文字
         textInjector.inject(text: text, targetPID: sourceInfo.pid) { [weak self] in
             guard let self = self else { return }
-            // 回填完成，解除旗標
+            // 回填完成，清空文字
+            panel.text = ""
             self.isInjecting = false
-            // 更新追蹤 key
             if let current = SourceAppInfo.fromFrontmostApp() {
                 self.lastFrontmostKey = current.bindingKey
             }

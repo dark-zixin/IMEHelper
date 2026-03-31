@@ -164,6 +164,7 @@ struct SourceAppInfo {
             return 0
         }
 
+        // 第一輪：標題 + 位置 + 大小 完全比對（最精確）
         for info in windowInfoList {
             guard let ownerPID = info[kCGWindowOwnerPID as String] as? pid_t,
                   ownerPID == pid,
@@ -175,17 +176,19 @@ struct SourceAppInfo {
             let wid = info[kCGWindowNumber as String] as? CGWindowID ?? 0
             let wTitle = info[kCGWindowName as String] as? String ?? ""
             let bounds = info[kCGWindowBounds as String] as? [String: CGFloat] ?? [:]
+            let x = bounds["X"] ?? 0
+            let y = bounds["Y"] ?? 0
             let w = bounds["Width"] ?? 0
             let h = bounds["Height"] ?? 0
 
-            // 用標題 + 大小比對（位置在座標系統轉換後可能有差異，大小比較穩定）
-            if wTitle == title && abs(w - size.width) < 2 && abs(h - size.height) < 2 {
+            if wTitle == title &&
+               abs(x - position.x) < 2 && abs(y - position.y) < 2 &&
+               abs(w - size.width) < 2 && abs(h - size.height) < 2 {
                 return wid
             }
         }
 
-        // 如果標題匹配失敗（可能標題有變動），用位置 + 大小比對
-        let screenHeight = NSScreen.main?.frame.height ?? 1440
+        // 第二輪：位置 + 大小（標題可能已變動）
         for info in windowInfoList {
             guard let ownerPID = info[kCGWindowOwnerPID as String] as? pid_t,
                   ownerPID == pid,
@@ -201,9 +204,6 @@ struct SourceAppInfo {
             let w = bounds["Width"] ?? 0
             let h = bounds["Height"] ?? 0
 
-            // AXPosition 是左下角原點，CGWindowList 是左上角原點
-            // AX y 轉 CG y：cgY = screenHeight - axY - height
-            // 但 AXPosition 回傳的其實是左上角原點（跟 CGWindowList 一樣）
             if abs(x - position.x) < 2 && abs(y - position.y) < 2 &&
                abs(w - size.width) < 2 && abs(h - size.height) < 2 {
                 return wid
