@@ -283,25 +283,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
         }
     }
 
-    /// 檢查並處理已關閉視窗和分頁的 panel
+    /// 檢查並處理已關閉視窗的 panel
     private func handleClosedWindows() {
-        // 視窗層清理
         let closedWindowPanels = windowManager.cleanupClosedWindows()
         handleOrphanedPanels(closedWindowPanels)
-
-        // 分頁層清理：檢查當前視窗中的分頁是否仍存在
-        if let frontApp = NSWorkspace.shared.frontmostApplication,
-           frontApp.processIdentifier != ProcessInfo.processInfo.processIdentifier,
-           let sourceApp = SourceAppInfo.fromFrontmostApp(),
-           sourceApp.windowID != 0 {
-            let currentTabs = SourceAppInfo.getAllTabDescriptions(pid: sourceApp.pid)
-            let closedTabPanels = windowManager.cleanupClosedTabs(
-                windowID: sourceApp.windowID,
-                currentTabDescriptions: currentTabs,
-                windowTitle: sourceApp.windowTitle
-            )
-            handleOrphanedPanels(closedTabPanels)
-        }
     }
 
     /// 統一處理孤立 panel（目標視窗/app 已關閉）

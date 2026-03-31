@@ -27,17 +27,15 @@ struct SourceAppInfo {
     /// CGWindowID（視窗存活期間唯一且穩定）
     let windowID: CGWindowID
 
+    /// 選中分頁的 tty（每個分頁唯一，從 AXValue 提取）
+    let tty: String
+
     /// 選中分頁的描述（透過 AXTabGroup 取得）
     let tabDescription: String
 
-    /// 選中分頁的索引（用來區分同描述的不同分頁）
-    let tabIndex: Int
-
-    /// 用於綁定識別的 key（PID + 視窗 + 分頁描述）
-    /// 注意：不含 tabIndex，因為關閉分頁會導致索引位移
-    /// 同描述的分頁會共用同一個 panel（已知限制，v2 用 app adapter 解決）
+    /// 用於綁定識別的 key（三層結構：PID + 視窗 + 分頁）
     var bindingKey: String {
-        // 視窗層：優先用 CGWindowID，fallback 到 windowTitle
+        // 視窗層
         let windowPart: String
         if windowID != 0 {
             windowPart = "win:\(windowID)"
@@ -45,9 +43,11 @@ struct SourceAppInfo {
             windowPart = "win:\(windowTitle)"
         }
 
-        // 分頁層：有分頁描述就加上（不含 index）
+        // 分頁層：優先用 tty（最精確），fallback 到 tabDescription
         let tabPart: String
-        if !tabDescription.isEmpty {
+        if !tty.isEmpty {
+            tabPart = "|tty:\(tty)"
+        } else if !tabDescription.isEmpty {
             tabPart = "|tab:\(tabDescription)"
         } else {
             tabPart = ""
@@ -59,14 +59,12 @@ struct SourceAppInfo {
     /// 從當前前景 app 取得資訊
     static func fromFrontmostApp() -> SourceAppInfo? {
         guard let frontApp = NSWorkspace.shared.frontmostApplication else {
-            NSLog("SourceAppInfo: 無法取得前景 app")
             return nil
         }
 
         let pid = frontApp.processIdentifier
         let appName = frontApp.localizedName ?? "未知 App"
         let bundleId = frontApp.bundleIdentifier
-
         let windowInfo = getWindowInfo(pid: pid)
 
         return SourceAppInfo(
@@ -75,8 +73,8 @@ struct SourceAppInfo {
             appName: appName,
             windowTitle: windowInfo.windowTitle,
             windowID: windowInfo.windowID,
-            tabDescription: windowInfo.tabDescription,
-            tabIndex: windowInfo.tabIndex
+            tty: windowInfo.tty,
+            tabDescription: windowInfo.tabDescription
         )
     }
 
@@ -97,26 +95,24 @@ struct SourceAppInfo {
             appName: appName,
             windowTitle: windowInfo.windowTitle,
             windowID: windowInfo.windowID,
-            tabDescription: windowInfo.tabDescription,
-            tabIndex: windowInfo.tabIndex
+            tty: windowInfo.tty,
+            tabDescription: windowInfo.tabDescription
         )
     }
 
     // MARK: - 私有方法
 
-    /// 視窗資訊結構
     private struct WindowInfo {
         let windowTitle: String
         let windowID: CGWindowID
+        let tty: String
         let tabDescription: String
-        let tabIndex: Int
     }
 
     /// 透過 Accessibility API 和 CGWindowList 取得焦點視窗完整資訊
     private static func getWindowInfo(pid: pid_t) -> WindowInfo {
         let appElement = AXUIElementCreateApplication(pid)
 
-        // 取得焦點視窗
         var focusedWindow: AnyObject?
         let result = AXUIElementCopyAttributeValue(
             appElement,
@@ -125,22 +121,17 @@ struct SourceAppInfo {
         )
 
         guard result == .success, let window = focusedWindow else {
-            return WindowInfo(
-                windowTitle: "",
-                windowID: 0,
-                tabDescription: "",
-                tabIndex: -1
-            )
+            return WindowInfo(windowTitle: "", windowID: 0, tty: "", tabDescription: "")
         }
 
         let axWindow = window as! AXUIElement
 
-        // 取得視窗標題
+        // 視窗標題
         var titleValue: AnyObject?
         AXUIElementCopyAttributeValue(axWindow, kAXTitleAttribute as CFString, &titleValue)
         let windowTitle = titleValue as? String ?? ""
 
-        // 取得視窗位置和大小（用來匹配 CGWindowID）
+        // 視窗位置和大小（匹配 CGWindowID 用）
         var axPosition = CGPoint.zero
         var axSize = CGSize.zero
 
@@ -156,108 +147,59 @@ struct SourceAppInfo {
             AXValueGetValue(sz as! AXValue, .cgSize, &axSize)
         }
 
-        // 取得 CGWindowID
         let windowID = getCGWindowID(pid: pid, title: windowTitle, position: axPosition, size: axSize)
 
-        // 取得選中分頁資訊
-        let (tabDesc, tabIdx) = getSelectedTabInfo(window: axWindow)
+        // 從焦點元素提取 tty
+        let tty = extractTTY(appElement: appElement)
 
-        return WindowInfo(
-            windowTitle: windowTitle,
-            windowID: windowID,
-            tabDescription: tabDesc,
-            tabIndex: tabIdx
-        )
+        // 分頁描述
+        let tabDesc = getSelectedTabDescription(window: axWindow)
+
+        return WindowInfo(windowTitle: windowTitle, windowID: windowID, tty: tty, tabDescription: tabDesc)
     }
 
-    /// 透過 CGWindowListCopyWindowInfo 比對取得 CGWindowID
-    private static func getCGWindowID(pid: pid_t, title: String, position: CGPoint, size: CGSize) -> CGWindowID {
-        guard let windowInfoList = CGWindowListCopyWindowInfo([.optionAll], kCGNullWindowID) as? [[String: Any]] else {
-            return 0
+    /// 從焦點元素的 AXValue 中提取 tty（例如 ttys027）
+    private static func extractTTY(appElement: AXUIElement) -> String {
+        var focusedElement: AnyObject?
+        AXUIElementCopyAttributeValue(appElement, kAXFocusedUIElementAttribute as CFString, &focusedElement)
+
+        guard let element = focusedElement else { return "" }
+
+        let axEl = element as! AXUIElement
+        var val: AnyObject?
+        AXUIElementCopyAttributeValue(axEl, kAXValueAttribute as CFString, &val)
+
+        guard let content = val as? String else { return "" }
+
+        // 在前 300 字元中搜尋 tty 模式：on ttysXXX
+        let searchRange = String(content.prefix(300))
+        if let range = searchRange.range(of: #"ttys\d+"#, options: .regularExpression) {
+            return String(searchRange[range])
         }
 
-        // 第一輪：onscreen + 標題 + 位置 + 大小 完全比對（最精確）
-        for info in windowInfoList {
-            guard let ownerPID = info[kCGWindowOwnerPID as String] as? pid_t,
-                  ownerPID == pid,
-                  let layer = info[kCGWindowLayer as String] as? Int,
-                  layer == 0,
-                  info[kCGWindowIsOnscreen as String] as? Bool == true else {
-                continue
-            }
-
-            let wid = info[kCGWindowNumber as String] as? CGWindowID ?? 0
-            let wTitle = info[kCGWindowName as String] as? String ?? ""
-            let bounds = info[kCGWindowBounds as String] as? [String: CGFloat] ?? [:]
-            let x = bounds["X"] ?? 0
-            let y = bounds["Y"] ?? 0
-            let w = bounds["Width"] ?? 0
-            let h = bounds["Height"] ?? 0
-
-            if wTitle == title &&
-               abs(x - position.x) < 2 && abs(y - position.y) < 2 &&
-               abs(w - size.width) < 2 && abs(h - size.height) < 2 {
-                return wid
-            }
-        }
-
-        // 第二輪：onscreen + 位置 + 大小（標題可能已變動）
-        for info in windowInfoList {
-            guard let ownerPID = info[kCGWindowOwnerPID as String] as? pid_t,
-                  ownerPID == pid,
-                  let layer = info[kCGWindowLayer as String] as? Int,
-                  layer == 0,
-                  info[kCGWindowIsOnscreen as String] as? Bool == true else {
-                continue
-            }
-
-            let wid = info[kCGWindowNumber as String] as? CGWindowID ?? 0
-            let bounds = info[kCGWindowBounds as String] as? [String: CGFloat] ?? [:]
-            let x = bounds["X"] ?? 0
-            let y = bounds["Y"] ?? 0
-            let w = bounds["Width"] ?? 0
-            let h = bounds["Height"] ?? 0
-
-            if abs(x - position.x) < 2 && abs(y - position.y) < 2 &&
-               abs(w - size.width) < 2 && abs(h - size.height) < 2 {
-                return wid
-            }
-        }
-
-        return 0
+        return ""
     }
 
-    /// 從視窗的 AXTabGroup 中找到選中的分頁，回傳其 AXDescription 和索引
-    private static func getSelectedTabInfo(window: AXUIElement) -> (description: String, index: Int) {
+    /// 從視窗的 AXTabGroup 中取得選中分頁的 AXDescription
+    private static func getSelectedTabDescription(window: AXUIElement) -> String {
         var children: AnyObject?
         AXUIElementCopyAttributeValue(window, kAXChildrenAttribute as CFString, &children)
 
-        guard let kids = children as? [AXUIElement] else {
-            return ("", -1)
-        }
+        guard let kids = children as? [AXUIElement] else { return "" }
 
         for child in kids {
             var role: AnyObject?
             AXUIElementCopyAttributeValue(child, kAXRoleAttribute as CFString, &role)
-
-            guard (role as? String) == "AXTabGroup" else {
-                continue
-            }
+            guard (role as? String) == "AXTabGroup" else { continue }
 
             var tabChildren: AnyObject?
             AXUIElementCopyAttributeValue(child, kAXChildrenAttribute as CFString, &tabChildren)
+            guard let tabs = tabChildren as? [AXUIElement] else { continue }
 
-            guard let tabs = tabChildren as? [AXUIElement] else {
-                continue
-            }
-
-            var tabIndex = 0
             for tab in tabs {
                 var tabRole: AnyObject?
                 AXUIElementCopyAttributeValue(tab, kAXRoleAttribute as CFString, &tabRole)
-                guard (tabRole as? String) == "AXRadioButton" else {
-                    continue
-                }
+                guard (tabRole as? String) == "AXRadioButton" else { continue }
 
                 var value: AnyObject?
                 AXUIElementCopyAttributeValue(tab, kAXValueAttribute as CFString, &value)
@@ -265,14 +207,12 @@ struct SourceAppInfo {
                 if let numValue = value as? NSNumber, numValue.intValue == 1 {
                     var desc: AnyObject?
                     AXUIElementCopyAttributeValue(tab, kAXDescriptionAttribute as CFString, &desc)
-                    return (desc as? String ?? "", tabIndex)
+                    return desc as? String ?? ""
                 }
-
-                tabIndex += 1
             }
         }
 
-        return ("", -1)
+        return ""
     }
 
     /// 取得指定 app 焦點視窗中所有分頁的描述列表
@@ -311,5 +251,62 @@ struct SourceAppInfo {
         }
 
         return []
+    }
+
+    /// 透過 CGWindowListCopyWindowInfo 比對取得 CGWindowID
+    private static func getCGWindowID(pid: pid_t, title: String, position: CGPoint, size: CGSize) -> CGWindowID {
+        guard let windowInfoList = CGWindowListCopyWindowInfo([.optionAll], kCGNullWindowID) as? [[String: Any]] else {
+            return 0
+        }
+
+        // 第一輪：標題 + 位置 + 大小
+        for info in windowInfoList {
+            guard let ownerPID = info[kCGWindowOwnerPID as String] as? pid_t,
+                  ownerPID == pid,
+                  let layer = info[kCGWindowLayer as String] as? Int,
+                  layer == 0,
+                  info[kCGWindowIsOnscreen as String] as? Bool == true else {
+                continue
+            }
+
+            let wid = info[kCGWindowNumber as String] as? CGWindowID ?? 0
+            let wTitle = info[kCGWindowName as String] as? String ?? ""
+            let bounds = info[kCGWindowBounds as String] as? [String: CGFloat] ?? [:]
+            let x = bounds["X"] ?? 0
+            let y = bounds["Y"] ?? 0
+            let w = bounds["Width"] ?? 0
+            let h = bounds["Height"] ?? 0
+
+            if wTitle == title &&
+               abs(x - position.x) < 2 && abs(y - position.y) < 2 &&
+               abs(w - size.width) < 2 && abs(h - size.height) < 2 {
+                return wid
+            }
+        }
+
+        // 第二輪：位置 + 大小
+        for info in windowInfoList {
+            guard let ownerPID = info[kCGWindowOwnerPID as String] as? pid_t,
+                  ownerPID == pid,
+                  let layer = info[kCGWindowLayer as String] as? Int,
+                  layer == 0,
+                  info[kCGWindowIsOnscreen as String] as? Bool == true else {
+                continue
+            }
+
+            let wid = info[kCGWindowNumber as String] as? CGWindowID ?? 0
+            let bounds = info[kCGWindowBounds as String] as? [String: CGFloat] ?? [:]
+            let x = bounds["X"] ?? 0
+            let y = bounds["Y"] ?? 0
+            let w = bounds["Width"] ?? 0
+            let h = bounds["Height"] ?? 0
+
+            if abs(x - position.x) < 2 && abs(y - position.y) < 2 &&
+               abs(w - size.width) < 2 && abs(h - size.height) < 2 {
+                return wid
+            }
+        }
+
+        return 0
     }
 }

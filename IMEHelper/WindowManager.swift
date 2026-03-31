@@ -20,16 +20,17 @@ class WindowManager {
         return bindings.first(where: { $0.bindingKey == sourceApp.bindingKey })?.panel
     }
 
-    /// 含 fallback 的查找（處理分頁關閉後 tab bar 消失的情況）
-    /// 只在快捷鍵觸發和 tryRestore 時使用
+    /// 含 fallback 的查找
+    /// 精確匹配失敗時，在同視窗內找唯一的候選（處理 tab bar 消失但 tty 提取不到的情況）
     func findWithFallback(for sourceApp: SourceAppInfo) -> InputPanel? {
-        // 精確匹配
         if let exact = find(for: sourceApp) {
             return exact
         }
 
-        // Fallback：只有當 tabDescription 為空時才啟用（代表 tab bar 已隱藏，只剩一個分頁）
-        // 如果有 tabDescription 但精確匹配失敗，代表這個分頁確實沒有 panel
+        // 有 tty 但精確匹配失敗 → 確實沒有 panel（tty 不受 tab bar 影響）
+        guard sourceApp.tty.isEmpty else { return nil }
+
+        // 沒有 tty 也沒有 tabDescription → 嘗試用 windowID 匹配唯一候選
         guard sourceApp.windowID != 0, sourceApp.tabDescription.isEmpty else { return nil }
 
         let candidates = bindings.filter {
@@ -115,62 +116,23 @@ class WindowManager {
     }
 
     /// 檢查同一視窗內的綁定，其分頁是否還存在
-    /// - Parameter currentTabDescriptions: 當前視窗中所有分頁的描述列表
-    /// - Parameter windowID: 要檢查的視窗 CGWindowID
+    /// 用當前 tty 和分頁列表交叉比對
     @discardableResult
-    func cleanupClosedTabs(windowID: CGWindowID, currentTabDescriptions: [String], windowTitle: String) -> [InputPanel] {
+    func cleanupClosedTabs(windowID: CGWindowID, currentTTY: String, currentTabDescriptions: [String]) -> [InputPanel] {
         guard windowID != 0 else { return [] }
 
-        // 找出同 windowID 下帶 tab 描述的所有綁定
-        let tabBindings = bindings.filter {
-            $0.windowID == windowID && $0.bindingKey.contains("|tab:")
+        // 收集當前視窗內所有存活的識別資訊
+        var aliveTTYs = Set<String>()
+        if !currentTTY.isEmpty {
+            aliveTTYs.insert(currentTTY)
         }
-        guard !tabBindings.isEmpty else { return [] }
 
-        if !currentTabDescriptions.isEmpty {
-            // 有 tab 列表：用描述計數比對
-            var availableCounts: [String: Int] = [:]
-            for desc in currentTabDescriptions where !desc.isEmpty {
-                availableCounts[desc, default: 0] += 1
-            }
+        // 注意：我們只能取得目前焦點分頁的 tty，無法取得其他分頁的 tty
+        // 所以只檢查帶 tty 的綁定是否跟當前 tty 匹配
 
-            var cleanedPanels: [InputPanel] = []
-            bindings.removeAll { binding in
-                guard binding.windowID == windowID,
-                      let tabRange = binding.bindingKey.range(of: "|tab:") else { return false }
-                let tabDesc = String(binding.bindingKey[tabRange.upperBound...])
-                guard !tabDesc.isEmpty else { return false }
-
-                let count = availableCounts[tabDesc, default: 0]
-                if count > 0 {
-                    availableCounts[tabDesc] = count - 1
-                    return false
-                }
-
-                cleanedPanels.append(binding.panel)
-                return true
-            }
-            return cleanedPanels
-        } else {
-            // tab bar 隱藏（只剩一個分頁）：用視窗標題比對
-            // 分頁描述通常包含視窗標題（例如描述 "dark@Mac: ~ (-zsh)" 包含標題 "dark@Mac: ~"）
-            var cleanedPanels: [InputPanel] = []
-            bindings.removeAll { binding in
-                guard binding.windowID == windowID,
-                      let tabRange = binding.bindingKey.range(of: "|tab:") else { return false }
-                let tabDesc = String(binding.bindingKey[tabRange.upperBound...])
-                guard !tabDesc.isEmpty else { return false }
-
-                // 如果分頁描述包含視窗標題，視為存活的分頁
-                if tabDesc.contains(windowTitle) && !windowTitle.isEmpty {
-                    return false
-                }
-
-                // 不匹配的分頁已關閉
-                cleanedPanels.append(binding.panel)
-                return true
-            }
-            return cleanedPanels
-        }
+        var cleanedPanels: [InputPanel] = []
+        // 不主動清理 — tty 比對只在單分頁時才可靠判斷
+        // 多分頁時無法得知非焦點分頁的 tty，不能貿然清理
+        return cleanedPanels
     }
 }
