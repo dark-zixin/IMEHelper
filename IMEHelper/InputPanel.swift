@@ -7,12 +7,20 @@
 
 import Cocoa
 
+/// InputPanel 事件委派協議
+protocol InputPanelDelegate: AnyObject {
+    /// 使用者按下 Enter 送出文字
+    func inputPanelDidSubmit(_ panel: InputPanel, text: String)
+    /// 窗口已關閉
+    func inputPanelDidClose(_ panel: InputPanel)
+}
+
 /// 浮動輸入窗口
 /// 提供一個半透明玻璃效果的浮動面板，讓使用者輸入文字
 class InputPanel: NSPanel {
 
     /// 文字輸入區域
-    private var textView: NSTextView!
+    private var textView: InputTextView!
 
     /// 捲動容器
     private var scrollView: NSScrollView!
@@ -20,8 +28,20 @@ class InputPanel: NSPanel {
     /// 玻璃效果背景
     private var visualEffectView: NSVisualEffectView!
 
+    /// 底部提示標籤
+    private var hintLabel: NSTextField!
+
+    /// ESC 狀態機
+    private var escStateMachine = EscStateMachine()
+
+    /// 提示標籤自動隱藏的計時器
+    private var hintTimer: Timer?
+
     /// 來源 app 資訊
     private(set) var sourceAppInfo: SourceAppInfo?
+
+    /// 事件委派
+    weak var panelDelegate: InputPanelDelegate?
 
     /// 初始化浮動輸入窗口
     init() {
@@ -43,8 +63,12 @@ class InputPanel: NSPanel {
         // 設定最小尺寸
         self.minSize = NSSize(width: 300, height: 150)
 
+        // 設定自己為 NSWindowDelegate 以攔截關閉事件
+        self.delegate = self
+
         setupVisualEffect()
         setupTextView()
+        setupHintLabel()
     }
 
     // MARK: - UI 建構
@@ -74,8 +98,9 @@ class InputPanel: NSPanel {
         scrollView.drawsBackground = false  // 透明背景，讓玻璃效果顯現
         scrollView.borderType = .noBorder
 
-        // 建立 NSTextView
-        textView = NSTextView()
+        // 建立自訂 InputTextView
+        textView = InputTextView()
+        textView.inputDelegate = self
         textView.isEditable = true
         textView.isSelectable = true
         textView.isRichText = false  // 純文字模式
@@ -104,12 +129,34 @@ class InputPanel: NSPanel {
         // 加入玻璃效果背景上
         visualEffectView.addSubview(scrollView)
 
-        // 設定 Auto Layout 約束
+        // 設定 Auto Layout 約束（底部保留空間給提示標籤）
         NSLayoutConstraint.activate([
             scrollView.topAnchor.constraint(equalTo: visualEffectView.topAnchor),
             scrollView.leadingAnchor.constraint(equalTo: visualEffectView.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: visualEffectView.trailingAnchor),
-            scrollView.bottomAnchor.constraint(equalTo: visualEffectView.bottomAnchor),
+        ])
+    }
+
+    /// 設定底部提示標籤
+    private func setupHintLabel() {
+        hintLabel = NSTextField(labelWithString: "")
+        hintLabel.translatesAutoresizingMaskIntoConstraints = false
+        hintLabel.font = NSFont.systemFont(ofSize: 11)
+        hintLabel.textColor = NSColor.secondaryLabelColor
+        hintLabel.alignment = .center
+        hintLabel.isHidden = true
+
+        visualEffectView.addSubview(hintLabel)
+
+        NSLayoutConstraint.activate([
+            // scrollView 底部接到 hintLabel 上方
+            scrollView.bottomAnchor.constraint(equalTo: hintLabel.topAnchor, constant: -2),
+
+            // hintLabel 固定在底部
+            hintLabel.leadingAnchor.constraint(equalTo: visualEffectView.leadingAnchor, constant: 8),
+            hintLabel.trailingAnchor.constraint(equalTo: visualEffectView.trailingAnchor, constant: -8),
+            hintLabel.bottomAnchor.constraint(equalTo: visualEffectView.bottomAnchor, constant: -4),
+            hintLabel.heightAnchor.constraint(equalToConstant: 16),
         ])
     }
 
@@ -200,7 +247,18 @@ class InputPanel: NSPanel {
 
     /// 隱藏窗口
     func hidePanel() {
+        hintTimer?.invalidate()
+        hintTimer = nil
+        escStateMachine.reset()
+        hideHintLabel()
         self.orderOut(nil)
+        panelDelegate?.inputPanelDidClose(self)
+    }
+
+    /// 重置 ESC 狀態機（文字變動時呼叫）
+    func resetEscState() {
+        escStateMachine.reset()
+        hideHintLabel()
     }
 
     // MARK: - 私有方法
@@ -208,6 +266,29 @@ class InputPanel: NSPanel {
     /// 將窗口置中於螢幕
     private func centerOnScreen() {
         self.center()
+    }
+
+    /// 顯示底部提示標籤
+    private func showHintLabel(message: String) {
+        hintLabel.stringValue = message
+        hintLabel.isHidden = false
+
+        // 取消之前的計時器
+        hintTimer?.invalidate()
+
+        // 設定自動隱藏計時器（與 ESC 超時同步 3 秒）
+        hintTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: false) { [weak self] _ in
+            self?.hideHintLabel()
+            self?.escStateMachine.reset()
+        }
+    }
+
+    /// 隱藏底部提示標籤
+    private func hideHintLabel() {
+        hintLabel.isHidden = true
+        hintLabel.stringValue = ""
+        hintTimer?.invalidate()
+        hintTimer = nil
     }
 
     // MARK: - NSPanel 覆寫
@@ -220,5 +301,72 @@ class InputPanel: NSPanel {
     /// 讓 panel 可以成為 main window
     override var canBecomeMain: Bool {
         return true
+    }
+}
+
+// MARK: - InputTextViewDelegate
+
+extension InputPanel: InputTextViewDelegate {
+
+    func inputTextViewDidPressEnter(_ textView: InputTextView) {
+        let content = textView.string.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !content.isEmpty else {
+            return
+        }
+
+        NSLog("InputPanel: 使用者送出文字，長度 \(content.count)")
+        panelDelegate?.inputPanelDidSubmit(self, text: content)
+    }
+
+    func inputTextViewDidPressEscape(_ textView: InputTextView) {
+        let hasText = !textView.string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let action = escStateMachine.handleEscape(hasText: hasText)
+
+        switch action {
+        case .showWarning(let message):
+            showHintLabel(message: message)
+
+        case .clearText:
+            textView.string = ""
+            showHintLabel(message: "文字已清空，再按一次 ESC 關閉視窗")
+
+        case .closePanel:
+            hidePanel()
+
+        case .none:
+            break
+        }
+    }
+}
+
+// MARK: - NSWindowDelegate
+
+extension InputPanel: NSWindowDelegate {
+
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        let hasText = !textView.string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+
+        guard hasText else {
+            // 沒有文字，直接關閉
+            panelDelegate?.inputPanelDidClose(self)
+            return true
+        }
+
+        // 有文字時跳出確認對話框
+        let alert = NSAlert()
+        alert.messageText = "確定要關閉嗎？"
+        alert.informativeText = "輸入區還有未送出的文字，關閉後將會遺失。"
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "關閉")
+        alert.addButton(withTitle: "取消")
+
+        let response = alert.runModal()
+        if response == .alertFirstButtonReturn {
+            panelDelegate?.inputPanelDidClose(self)
+            return true
+        }
+
+        return false
     }
 }

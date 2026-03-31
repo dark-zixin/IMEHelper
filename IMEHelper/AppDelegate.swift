@@ -10,7 +10,7 @@ import ServiceManagement
 import ApplicationServices
 
 @main
-class AppDelegate: NSObject, NSApplicationDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
 
     // Menu Bar 狀態列項目
     private var statusItem: NSStatusItem!
@@ -136,7 +136,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // 建立或重用 InputPanel
         if inputPanel == nil {
-            inputPanel = InputPanel()
+            let panel = InputPanel()
+            panel.panelDelegate = self
+            inputPanel = panel
         }
 
         guard let panel = inputPanel else {
@@ -159,6 +161,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             caretPosition: caretInfo?.position,
             caretHeight: caretInfo?.height ?? 16
         )
+    }
+
+    // MARK: - Accessibility 權限檢查
+
+    // MARK: - InputPanelDelegate
+
+    func inputPanelDidSubmit(_ panel: InputPanel, text: String) {
+        NSLog("AppDelegate: 收到送出文字，長度 \(text.count)")
+        // Phase 4 才實作回填，目前只關閉窗口
+        panel.hidePanel()
+    }
+
+    func inputPanelDidClose(_ panel: InputPanel) {
+        NSLog("AppDelegate: 輸入窗口已關閉")
+        // 清理窗口狀態（目前保留 inputPanel 實例以重用）
     }
 
     // MARK: - Accessibility 權限檢查
