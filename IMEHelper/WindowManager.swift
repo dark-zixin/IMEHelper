@@ -16,7 +16,22 @@ class WindowManager {
 
     /// 根據來源 app 資訊查詢已存在的窗口（精確匹配 bindingKey）
     func find(for sourceApp: SourceAppInfo) -> InputPanel? {
-        return bindings.first(where: { $0.bindingKey == sourceApp.bindingKey })?.panel
+        // 精確匹配
+        if let exact = bindings.first(where: { $0.bindingKey == sourceApp.bindingKey }) {
+            return exact.panel
+        }
+
+        // Fallback：同 pid + windowID 匹配（處理分頁關閉後 tab bar 消失的情況）
+        guard sourceApp.windowID != 0 else { return nil }
+
+        let candidates = bindings.filter {
+            $0.pid == sourceApp.pid && $0.windowID == sourceApp.windowID
+        }
+
+        // 只有唯一匹配時才使用
+        guard candidates.count == 1 else { return nil }
+
+        return candidates[0].panel
     }
 
     /// 綁定新的 InputPanel 到來源 app
