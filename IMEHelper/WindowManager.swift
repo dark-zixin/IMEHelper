@@ -20,17 +20,14 @@ class WindowManager {
         return bindings.first(where: { $0.bindingKey == sourceApp.bindingKey })?.panel
     }
 
-    /// 含 fallback 的查找
-    /// 精確匹配失敗時，在同視窗內找唯一的候選（處理 tab bar 消失但 tty 提取不到的情況）
+    /// 含 fallback 的查找（處理 tab bar 消失的情況）
+    /// 只在快捷鍵觸發時使用
     func findWithFallback(for sourceApp: SourceAppInfo) -> InputPanel? {
         if let exact = find(for: sourceApp) {
             return exact
         }
 
-        // 有 tty 但精確匹配失敗 → 確實沒有 panel（tty 不受 tab bar 影響）
-        guard sourceApp.tty.isEmpty else { return nil }
-
-        // 沒有 tty 也沒有 tabDescription → 嘗試用 windowID 匹配唯一候選
+        // Fallback：tabDescription 為空（tab bar 隱藏）時用 windowID 匹配唯一候選
         guard sourceApp.windowID != 0, sourceApp.tabDescription.isEmpty else { return nil }
 
         let candidates = bindings.filter {
@@ -112,27 +109,6 @@ class WindowManager {
             }
             return false
         }
-        return cleanedPanels
-    }
-
-    /// 檢查同一視窗內的綁定，其分頁是否還存在
-    /// 用當前 tty 和分頁列表交叉比對
-    @discardableResult
-    func cleanupClosedTabs(windowID: CGWindowID, currentTTY: String, currentTabDescriptions: [String]) -> [InputPanel] {
-        guard windowID != 0 else { return [] }
-
-        // 收集當前視窗內所有存活的識別資訊
-        var aliveTTYs = Set<String>()
-        if !currentTTY.isEmpty {
-            aliveTTYs.insert(currentTTY)
-        }
-
-        // 注意：我們只能取得目前焦點分頁的 tty，無法取得其他分頁的 tty
-        // 所以只檢查帶 tty 的綁定是否跟當前 tty 匹配
-
-        var cleanedPanels: [InputPanel] = []
-        // 不主動清理 — tty 比對只在單分頁時才可靠判斷
-        // 多分頁時無法得知非焦點分頁的 tty，不能貿然清理
         return cleanedPanels
     }
 }

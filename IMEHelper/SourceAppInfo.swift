@@ -27,15 +27,11 @@ struct SourceAppInfo {
     /// CGWindowID（視窗存活期間唯一且穩定）
     let windowID: CGWindowID
 
-    /// 選中分頁的 tty（每個分頁唯一，從 AXValue 提取）
-    let tty: String
-
     /// 選中分頁的描述（透過 AXTabGroup 取得）
     let tabDescription: String
 
-    /// 用於綁定識別的 key（三層結構：PID + 視窗 + 分頁）
+    /// 用於綁定識別的 key（PID + CGWindowID + 分頁描述）
     var bindingKey: String {
-        // 視窗層
         let windowPart: String
         if windowID != 0 {
             windowPart = "win:\(windowID)"
@@ -43,11 +39,8 @@ struct SourceAppInfo {
             windowPart = "win:\(windowTitle)"
         }
 
-        // 分頁層：優先用 tty（最精確），fallback 到 tabDescription
         let tabPart: String
-        if !tty.isEmpty {
-            tabPart = "|tty:\(tty)"
-        } else if !tabDescription.isEmpty {
+        if !tabDescription.isEmpty {
             tabPart = "|tab:\(tabDescription)"
         } else {
             tabPart = ""
@@ -73,7 +66,6 @@ struct SourceAppInfo {
             appName: appName,
             windowTitle: windowInfo.windowTitle,
             windowID: windowInfo.windowID,
-            tty: windowInfo.tty,
             tabDescription: windowInfo.tabDescription
         )
     }
@@ -95,7 +87,6 @@ struct SourceAppInfo {
             appName: appName,
             windowTitle: windowInfo.windowTitle,
             windowID: windowInfo.windowID,
-            tty: windowInfo.tty,
             tabDescription: windowInfo.tabDescription
         )
     }
@@ -105,7 +96,6 @@ struct SourceAppInfo {
     private struct WindowInfo {
         let windowTitle: String
         let windowID: CGWindowID
-        let tty: String
         let tabDescription: String
     }
 
@@ -121,7 +111,7 @@ struct SourceAppInfo {
         )
 
         guard result == .success, let window = focusedWindow else {
-            return WindowInfo(windowTitle: "", windowID: 0, tty: "", tabDescription: "")
+            return WindowInfo(windowTitle: "", windowID: 0, tabDescription: "")
         }
 
         let axWindow = window as! AXUIElement
@@ -148,51 +138,9 @@ struct SourceAppInfo {
         }
 
         let windowID = getCGWindowID(pid: pid, title: windowTitle, position: axPosition, size: axSize)
-
-        // 從焦點元素提取 tty
-        let tty = extractTTY(appElement: appElement)
-
-        // 分頁描述
         let tabDesc = getSelectedTabDescription(window: axWindow)
 
-        return WindowInfo(windowTitle: windowTitle, windowID: windowID, tty: tty, tabDescription: tabDesc)
-    }
-
-    /// 從焦點元素的 AXValue 中提取 tty（例如 ttys027）
-    private static func extractTTY(appElement: AXUIElement) -> String {
-        var focusedElement: AnyObject?
-        AXUIElementCopyAttributeValue(appElement, kAXFocusedUIElementAttribute as CFString, &focusedElement)
-
-        guard let element = focusedElement else { return "" }
-
-        let axEl = element as! AXUIElement
-        var val: AnyObject?
-        AXUIElementCopyAttributeValue(axEl, kAXValueAttribute as CFString, &val)
-
-        guard let content = val as? String else { return "" }
-
-        // 搜尋 "on ttysXXX" 模式（登入訊息中的 tty）
-        // 先搜前 500 字元（效能考量），找不到再搜全文
-        let quickSearch = String(content.prefix(500))
-        if let range = quickSearch.range(of: #"on (ttys\d+)"#, options: .regularExpression) {
-            let match = quickSearch[range]
-            // 提取 ttysXXX 部分
-            if let ttyRange = match.range(of: #"ttys\d+"#, options: .regularExpression) {
-                return String(match[ttyRange])
-            }
-        }
-
-        // 全文搜尋（處理輸出較多的情況）
-        if content.count > 500 {
-            if let range = content.range(of: #"on (ttys\d+)"#, options: .regularExpression) {
-                let match = content[range]
-                if let ttyRange = match.range(of: #"ttys\d+"#, options: .regularExpression) {
-                    return String(match[ttyRange])
-                }
-            }
-        }
-
-        return ""
+        return WindowInfo(windowTitle: windowTitle, windowID: windowID, tabDescription: tabDesc)
     }
 
     /// 從視窗的 AXTabGroup 中取得選中分頁的 AXDescription
