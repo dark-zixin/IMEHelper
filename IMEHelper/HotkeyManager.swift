@@ -14,9 +14,8 @@ class HotkeyManager {
     /// 快捷鍵被觸發時的 callback
     var onHotkeyPressed: (() -> Void)?
 
-    /// 事件 tap 的參考，用於啟停控制
-    /// fileprivate 是因為同檔案的全域 callback 函式需要存取
-    fileprivate var eventTap: CFMachPort?
+    /// 事件 tap 的參考，用於啟停控制和外部檢查是否啟動成功
+    private(set) var eventTap: CFMachPort?
 
     /// 背景 RunLoop 執行緒
     private var runLoopThread: Thread?

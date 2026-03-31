@@ -257,11 +257,25 @@ class InputPanel: NSPanel {
             centerOnScreen()
 
         case .rememberLast:
-            // 記住上次位置
+            // 記住上次位置，並做螢幕邊界校正
             if let lastPosition = settings.lastWindowPosition {
-                self.setFrameOrigin(lastPosition)
+                var pos = lastPosition
+                let panelSize = self.frame.size
+
+                // 找到包含此位置的螢幕，或退回主螢幕
+                let targetScreen = NSScreen.screens.first(where: {
+                    $0.visibleFrame.contains(NSPoint(x: pos.x + 1, y: pos.y + 1))
+                }) ?? NSScreen.main
+
+                if let screen = targetScreen {
+                    let visibleFrame = screen.visibleFrame
+                    // 確保窗口不超出螢幕可見範圍
+                    pos.x = min(max(pos.x, visibleFrame.minX), visibleFrame.maxX - panelSize.width)
+                    pos.y = min(max(pos.y, visibleFrame.minY), visibleFrame.maxY - panelSize.height)
+                }
+
+                self.setFrameOrigin(pos)
             } else {
-                // 沒有上次位置記錄，fallback 到游標位置
                 positionAtCaret(caretPosition: caretPosition, caretHeight: caretHeight)
             }
         }
@@ -281,22 +295,18 @@ class InputPanel: NSPanel {
         self.makeFirstResponder(textView)
     }
 
-    /// 隱藏窗口
-    /// 注意：不再負責 activate 來源 app，改由 AppDelegate 統一處理焦點歸還
+    /// 關閉窗口並清理資源
     func hidePanel() {
         hintTimer?.invalidate()
         hintTimer = nil
         escStateMachine.reset()
         hideHintLabel()
-        self.orderOut(nil)
 
-        panelDelegate?.inputPanelDidClose(self)
-    }
-
-    /// 程式主動關閉窗口（不觸發 windowShouldClose 確認對話框）
-    func closeProgrammatically() {
+        // 通知 delegate 再 close，避免 close 觸發 windowShouldClose 的確認對話框
+        let delegate = panelDelegate
         isClosingProgrammatically = true
         self.close()
+        delegate?.inputPanelDidClose(self)
     }
 
     /// 重置 ESC 狀態機（文字變動時呼叫）
@@ -512,9 +522,8 @@ extension InputPanel: InputTextViewDelegate {
 extension InputPanel: NSWindowDelegate {
 
     func windowShouldClose(_ sender: NSWindow) -> Bool {
-        // 程式主動關閉時，跳過確認對話框
+        // 程式主動關閉時，跳過確認對話框（delegate 已由呼叫端通知）
         if isClosingProgrammatically {
-            panelDelegate?.inputPanelDidClose(self)
             return true
         }
 

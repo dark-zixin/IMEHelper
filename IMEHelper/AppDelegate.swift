@@ -110,6 +110,29 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
             self?.handleHotkeyPressed()
         }
         hotkeyManager.start()
+
+        // 如果啟動失敗（可能尚未授權），定時 retry
+        if hotkeyManager.eventTap == nil {
+            startHotkeyRetryTimer()
+        }
+    }
+
+    /// 定時嘗試重新啟動快捷鍵監聽（等待使用者授權 Accessibility 權限後）
+    private func startHotkeyRetryTimer() {
+        Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { [weak self] timer in
+            guard let self = self else {
+                timer.invalidate()
+                return
+            }
+            guard AXIsProcessTrusted() else { return }
+
+            // 權限已授權，重新啟動
+            self.hotkeyManager.start()
+            if self.hotkeyManager.eventTap != nil {
+                timer.invalidate()
+                NSLog("AppDelegate: Accessibility 權限已授權，快捷鍵監聽已啟動")
+            }
+        }
     }
 
     /// 處理快捷鍵觸發事件
@@ -204,7 +227,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
         // 清理已關閉的 app 的綁定，並 close 對應的 panel 釋放資源
         let cleanedPanels = windowManager.cleanupTerminatedApps()
         for panel in cleanedPanels {
-            panel.closeProgrammatically()
+            panel.hidePanel()
         }
 
         // 延遲取得視窗標題，嘗試自動恢復
@@ -340,7 +363,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
             if success {
                 // 回填成功，清空文字並關閉 panel
                 panel.text = ""
-                panel.closeProgrammatically()
+                panel.hidePanel()
                 NSLog("AppDelegate: 文字回填完成")
             } else {
                 // 目標已關閉，保留文字讓使用者可以手動複製
@@ -362,10 +385,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
            let app = NSRunningApplication(processIdentifier: info.pid),
            !app.isTerminated {
             app.activate(options: [])
-        }
-        // 確保 panel 被 close 釋放資源（如果尚未 close）
-        if panel.isVisible {
-            panel.closeProgrammatically()
         }
     }
 
