@@ -24,6 +24,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
     // 文字回填注入器
     private var textInjector = TextInjector()
 
+    // 視窗標題變化偵測計時器
+    private var windowTitleCheckTimer: Timer?
+
+    // 上次偵測到的前景視窗標題和 PID
+    private var lastFrontmostKey: String = ""
+
+    // 文字回填進行中旗標，抑制自動恢復
+    private var isInjecting: Bool = false
+
     func applicationDidFinishLaunching(_ aNotification: Notification) {
         // 建立 Menu Bar 圖示
         setupStatusItem()
@@ -41,10 +50,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
             name: NSWorkspace.didActivateApplicationNotification,
             object: nil
         )
+
+        // 啟動視窗標題變化偵測（每 0.5 秒檢查一次，偵測同 app 內的視窗/分頁切換）
+        startWindowTitleMonitor()
     }
 
     func applicationWillTerminate(_ aNotification: Notification) {
         hotkeyManager?.stop()
+        windowTitleCheckTimer?.invalidate()
     }
 
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
@@ -179,27 +192,95 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
 
     // MARK: - App 切換監聽
 
-    /// 監聽 app 切換事件，隱藏所有可見的 InputPanel
+    /// 監聽 app 切換事件
     @objc private func activeAppDidChange(_ notification: Notification) {
         guard let userInfo = notification.userInfo,
               let app = userInfo[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else {
             return
         }
 
-        // 切換到自己（IMEHelper）不做處理
-        if app.processIdentifier == ProcessInfo.processInfo.processIdentifier {
+        // 切換到自己（IMEHelper）或正在回填中，不做處理
+        if app.processIdentifier == ProcessInfo.processInfo.processIdentifier || isInjecting {
             return
         }
 
-        // 隱藏所有可見的 InputPanel（只用 orderOut，不觸發完整的 hidePanel）
-        for binding in windowManager.allBindings {
-            if binding.panel.isVisible {
-                binding.panel.orderOut(nil)
-            }
-        }
+        // 隱藏所有可見的 InputPanel
+        windowManager.hideAll()
 
         // 清理已關閉的 app 的綁定
         windowManager.cleanupTerminatedApps()
+
+        // 延遲取得視窗標題，嘗試自動恢復
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            self?.tryRestorePanel()
+        }
+    }
+
+    // MARK: - 視窗標題變化偵測
+
+    /// 啟動定時檢查前景視窗標題（偵測同 app 內的視窗/分頁切換）
+    private func startWindowTitleMonitor() {
+        windowTitleCheckTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+            self?.checkWindowTitleChange()
+        }
+    }
+
+    /// 檢查前景視窗標題是否變化，觸發隱藏/恢復
+    private func checkWindowTitleChange() {
+        // 正在回填中或自己是前景 app，不做處理
+        guard !isInjecting,
+              let frontApp = NSWorkspace.shared.frontmostApplication,
+              frontApp.processIdentifier != ProcessInfo.processInfo.processIdentifier else {
+            return
+        }
+
+        // 取得當前前景視窗資訊
+        guard let sourceApp = SourceAppInfo.fromFrontmostApp() else {
+            return
+        }
+
+        let currentKey = "\(sourceApp.pid)_\(sourceApp.windowTitle)"
+
+        // 標題沒變，不做處理
+        guard currentKey != lastFrontmostKey else {
+            return
+        }
+
+        lastFrontmostKey = currentKey
+
+        // 標題變了（同 app 內切換視窗/分頁）→ 隱藏所有窗口再嘗試恢復
+        windowManager.hideAll()
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            self?.tryRestorePanel()
+        }
+    }
+
+    /// 嘗試恢復前景視窗對應的 InputPanel
+    private func tryRestorePanel() {
+        // 正在回填中，不恢復
+        guard !isInjecting else { return }
+
+        // 確認自己不是前景 app
+        guard let frontApp = NSWorkspace.shared.frontmostApplication,
+              frontApp.processIdentifier != ProcessInfo.processInfo.processIdentifier else {
+            return
+        }
+
+        guard let sourceApp = SourceAppInfo.fromFrontmostApp() else {
+            return
+        }
+
+        // 更新追蹤 key
+        lastFrontmostKey = "\(sourceApp.pid)_\(sourceApp.windowTitle)"
+
+        // 檢查是否有對應的窗口且有內容
+        if let existingPanel = windowManager.find(for: sourceApp),
+           !existingPanel.text.isEmpty {
+            NSApp.activate(ignoringOtherApps: true)
+            existingPanel.makeKeyAndOrderFront(nil)
+            existingPanel.focusTextView()
+        }
     }
 
     // MARK: - InputPanelDelegate
@@ -213,18 +294,27 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
             return
         }
 
-        // 只隱藏視窗，不觸發 hidePanel 的完整邏輯
-        // 因為 TextInjector 會負責 activate 目標 app，避免與 hidePanel 的 activate 衝突
+        // 設定回填旗標，抑制自動恢復
+        isInjecting = true
+
+        // 先移除綁定，避免回填過程中被自動恢復
+        windowManager.remove(panel: panel)
+
+        // 隱藏視窗並清理
         panel.orderOut(nil)
+        panel.text = ""
+        panel.resetEscState()
 
         // 用 TextInjector 回填文字
-        textInjector.inject(text: text, targetPID: sourceInfo.pid) {
-            // 回填完成後清理窗口狀態
-            panel.text = ""
-            panel.resetEscState()
-            // 移除綁定
-            self.windowManager.remove(panel: panel)
-            NSLog("AppDelegate: 文字回填完成，已移除窗口綁定")
+        textInjector.inject(text: text, targetPID: sourceInfo.pid) { [weak self] in
+            guard let self = self else { return }
+            // 回填完成，解除旗標
+            self.isInjecting = false
+            // 更新追蹤 key
+            if let current = SourceAppInfo.fromFrontmostApp() {
+                self.lastFrontmostKey = "\(current.pid)_\(current.windowTitle)"
+            }
+            NSLog("AppDelegate: 文字回填完成")
         }
     }
 
