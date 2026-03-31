@@ -15,15 +15,25 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // Menu Bar 狀態列項目
     private var statusItem: NSStatusItem!
 
+    // 全域快捷鍵管理器
+    private var hotkeyManager: HotkeyManager!
+
+    // 浮動輸入窗口（Phase 5 才做多窗口，目前只用一個）
+    private var inputPanel: InputPanel?
+
     func applicationDidFinishLaunching(_ aNotification: Notification) {
         // 建立 Menu Bar 圖示
         setupStatusItem()
 
         // 檢查 Accessibility 權限
         checkAccessibilityPermission()
+
+        // 設定全域快捷鍵
+        setupHotkeyManager()
     }
 
     func applicationWillTerminate(_ aNotification: Notification) {
+        hotkeyManager?.stop()
     }
 
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
@@ -97,6 +107,55 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// 檢查目前是否已設定開機啟動
     private func isLaunchAtLoginEnabled() -> Bool {
         return SMAppService.mainApp.status == .enabled
+    }
+
+    // MARK: - 全域快捷鍵
+
+    /// 設定全域快捷鍵管理器
+    private func setupHotkeyManager() {
+        hotkeyManager = HotkeyManager()
+        hotkeyManager.onHotkeyPressed = { [weak self] in
+            self?.handleHotkeyPressed()
+        }
+        hotkeyManager.start()
+    }
+
+    /// 處理快捷鍵觸發事件
+    private func handleHotkeyPressed() {
+        // 如果已有 InputPanel 且正在顯示，則隱藏（toggle 行為）
+        if let panel = inputPanel, panel.isVisible {
+            panel.hidePanel()
+            return
+        }
+
+        // 取得來源 app 資訊（在建立 panel 之前，因為 panel 顯示後前景 app 會變成自己）
+        let sourceApp = SourceAppInfo.fromFrontmostApp()
+
+        // 取得游標位置
+        let caretInfo = CaretPositionHelper.getCaretPosition()
+
+        // 建立或重用 InputPanel
+        if inputPanel == nil {
+            inputPanel = InputPanel()
+        }
+
+        guard let panel = inputPanel else {
+            return
+        }
+
+        // 設定來源 app 資訊
+        if let info = sourceApp {
+            panel.setSourceApp(info)
+        }
+
+        // 清空之前的文字
+        panel.text = ""
+
+        // 顯示在游標位置或螢幕中央
+        panel.showAt(
+            caretPosition: caretInfo?.position,
+            caretHeight: caretInfo?.height ?? 16
+        )
     }
 
     // MARK: - Accessibility 權限檢查
