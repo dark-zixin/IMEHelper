@@ -217,44 +217,6 @@ struct SourceAppInfo {
         return ""
     }
 
-    /// 取得指定 app 焦點視窗中所有分頁的描述列表
-    static func getAllTabDescriptions(pid: pid_t) -> [String] {
-        let appElement = AXUIElementCreateApplication(pid)
-
-        var focusedWindow: AnyObject?
-        let result = AXUIElementCopyAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, &focusedWindow)
-        guard result == .success, let window = focusedWindow else { return [] }
-
-        let axWindow = window as! AXUIElement
-        var children: AnyObject?
-        AXUIElementCopyAttributeValue(axWindow, kAXChildrenAttribute as CFString, &children)
-        guard let kids = children as? [AXUIElement] else { return [] }
-
-        for child in kids {
-            var role: AnyObject?
-            AXUIElementCopyAttributeValue(child, kAXRoleAttribute as CFString, &role)
-            guard (role as? String) == "AXTabGroup" else { continue }
-
-            var tabChildren: AnyObject?
-            AXUIElementCopyAttributeValue(child, kAXChildrenAttribute as CFString, &tabChildren)
-            guard let tabs = tabChildren as? [AXUIElement] else { continue }
-
-            var descriptions: [String] = []
-            for tab in tabs {
-                var tabRole: AnyObject?
-                AXUIElementCopyAttributeValue(tab, kAXRoleAttribute as CFString, &tabRole)
-                guard (tabRole as? String) == "AXRadioButton" else { continue }
-
-                var desc: AnyObject?
-                AXUIElementCopyAttributeValue(tab, kAXDescriptionAttribute as CFString, &desc)
-                descriptions.append(desc as? String ?? "")
-            }
-            return descriptions
-        }
-
-        return []
-    }
-
     /// 透過 CGWindowListCopyWindowInfo 比對取得 CGWindowID
     private static func getCGWindowID(pid: pid_t, title: String, position: CGPoint, size: CGSize) -> CGWindowID {
         guard let windowInfoList = CGWindowListCopyWindowInfo([.optionAll], kCGNullWindowID) as? [[String: Any]] else {
