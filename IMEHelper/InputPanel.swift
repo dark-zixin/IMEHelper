@@ -228,6 +228,7 @@ class InputPanel: NSPanel {
     /// 標記為孤立狀態（目標視窗已關閉），更新標題列提示
     func markAsOrphaned() {
         isOrphaned = true
+        self.hidesOnDeactivate = false  // 不隨 app 失焦自動隱藏
         self.title = "⚠ 目標視窗已關閉 — 請手動複製文字後關閉"
     }
 
@@ -235,6 +236,7 @@ class InputPanel: NSPanel {
     func markAsEvictionCandidate() {
         isOrphaned = true  // 不受 hideAll 影響
         sourceAppInfo = nil  // 清掉來源，關閉時不切焦點
+        self.hidesOnDeactivate = false  // 不隨 app 失焦自動隱藏
         self.title = "⚠ 窗口數量已達上限 — 請複製文字後關閉以釋放空間"
     }
 
