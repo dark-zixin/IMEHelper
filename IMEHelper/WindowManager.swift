@@ -20,38 +20,23 @@ class WindowManager {
         return bindings.first(where: { $0.bindingKey == sourceApp.bindingKey })?.panel
     }
 
-    /// 含 fallback 的查找
+    /// 含 fallback 的查找（處理 tab bar 消失的情況）
     /// 只在快捷鍵觸發時使用
     func findWithFallback(for sourceApp: SourceAppInfo) -> InputPanel? {
         if let exact = find(for: sourceApp) {
             return exact
         }
 
-        guard sourceApp.windowID != 0 else { return nil }
+        // Fallback：tabDescription 為空（tab bar 隱藏）時用 windowID 匹配唯一候選
+        guard sourceApp.windowID != 0, sourceApp.tabDescription.isEmpty else { return nil }
 
-        // Fallback 1：同 windowID + 同 tabDescription（處理 loginLine 消失/改變的情況）
-        if !sourceApp.tabDescription.isEmpty {
-            let candidates = bindings.filter {
-                $0.pid == sourceApp.pid &&
-                $0.windowID == sourceApp.windowID &&
-                $0.bindingKey.contains("|tab:\(sourceApp.tabDescription)")
-            }
-            if candidates.count == 1 {
-                return candidates[0].panel
-            }
+        let candidates = bindings.filter {
+            $0.pid == sourceApp.pid && $0.windowID == sourceApp.windowID
         }
 
-        // Fallback 2：同 windowID 唯一候選（處理 tab bar 消失的情況）
-        if sourceApp.tabDescription.isEmpty {
-            let candidates = bindings.filter {
-                $0.pid == sourceApp.pid && $0.windowID == sourceApp.windowID
-            }
-            if candidates.count == 1 {
-                return candidates[0].panel
-            }
-        }
+        guard candidates.count == 1 else { return nil }
 
-        return nil
+        return candidates[0].panel
     }
 
     /// 綁定新的 InputPanel 到來源 app
@@ -63,6 +48,24 @@ class WindowManager {
             panel: panel
         )
         bindings.append(binding)
+    }
+
+    /// 嘗試補回 windowID == 0 的 binding 的真正 windowID
+    /// - Parameter sourceApp: 當前的來源 app 資訊（含最新的 windowID）
+    func migrateIfNeeded(for sourceApp: SourceAppInfo) {
+        guard sourceApp.windowID != 0 else { return }
+
+        // 找到同 PID、windowID == 0、且 bindingKey 包含相同 windowTitle 的 binding
+        let titleKey = "win:\(sourceApp.windowTitle)"
+        guard let idx = bindings.firstIndex(where: {
+            $0.pid == sourceApp.pid && $0.windowID == 0 && $0.bindingKey.contains(titleKey)
+        }) else { return }
+
+        // 更新 windowID 和 bindingKey
+        bindings[idx].windowID = sourceApp.windowID
+        bindings[idx].bindingKey = sourceApp.bindingKey
+
+        NSLog("WindowManager: migrate windowID 0 → \(sourceApp.windowID), key=\(sourceApp.bindingKey)")
     }
 
     /// 移除指定的 InputPanel 綁定

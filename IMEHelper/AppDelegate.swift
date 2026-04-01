@@ -171,6 +171,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
         // 檢查是否已有對應的窗口（含 fallback 匹配）
         if let existingPanel = windowManager.findWithFallback(for: sourceApp) {
             existingPanel.setSourceApp(sourceApp)
+            // 順便嘗試補回 windowID
+            windowManager.migrateIfNeeded(for: sourceApp)
 
             if existingPanel.isVisible {
                 // 窗口已顯示 → 隱藏（toggle）
@@ -203,6 +205,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
         // 更新追蹤 key，防止 timer 把剛顯示的 panel 當成「標題變化」隱藏掉
         lastFrontmostKey = sourceApp.bindingKey
 
+        // 如果 windowID == 0，啟動 retry 嘗試補回
+        if sourceApp.windowID == 0 {
+            retryWindowID(pid: sourceApp.pid)
+        }
+
         // 背景 app 需要先 activate 才能顯示視窗
         NSApp.activate(ignoringOtherApps: true)
 
@@ -213,7 +220,24 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
         )
     }
 
-    // MARK: - App 切換監聽
+    /// windowID == 0 時的 retry（50ms / 150ms / 300ms）
+    private func retryWindowID(pid: pid_t) {
+        for delay in [0.05, 0.15, 0.3] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                guard let self = self else { return }
+
+                // 重新取得來源 app 資訊
+                guard let sourceApp = SourceAppInfo.fromApp(pid: pid),
+                      sourceApp.windowID != 0 else { return }
+
+                // 補回 windowID
+                self.windowManager.migrateIfNeeded(for: sourceApp)
+                self.lastFrontmostKey = sourceApp.bindingKey
+            }
+        }
+    }
+
+    // MARK: - App 切換監聯
 
     /// 監聽 app 切換事件
     @objc private func activeAppDidChange(_ notification: Notification) {
@@ -318,6 +342,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
         guard let sourceApp = SourceAppInfo.fromFrontmostApp() else {
             return
         }
+
+        // 順便嘗試補回 windowID
+        windowManager.migrateIfNeeded(for: sourceApp)
 
         // 更新追蹤 key
         lastFrontmostKey = sourceApp.bindingKey
