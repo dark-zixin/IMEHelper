@@ -52,20 +52,80 @@ class WindowManager {
 
     /// 嘗試補回 windowID == 0 的 binding 的真正 windowID
     /// - Parameter sourceApp: 當前的來源 app 資訊（含最新的 windowID）
-    func migrateIfNeeded(for sourceApp: SourceAppInfo) {
-        guard sourceApp.windowID != 0 else { return }
+    /// - Returns: 是否成功遷移
+    @discardableResult
+    func migrateIfNeeded(for sourceApp: SourceAppInfo) -> Bool {
+        guard sourceApp.windowID != 0 else { return false }
 
         // 找到同 PID、windowID == 0、且 bindingKey 包含相同 windowTitle 的 binding
         let titleKey = "win:\(sourceApp.windowTitle)"
         guard let idx = bindings.firstIndex(where: {
             $0.pid == sourceApp.pid && $0.windowID == 0 && $0.bindingKey.contains(titleKey)
-        }) else { return }
+        }) else { return false }
 
         // 更新 windowID 和 bindingKey
         bindings[idx].windowID = sourceApp.windowID
         bindings[idx].bindingKey = sourceApp.bindingKey
 
         NSLog("WindowManager: migrate windowID 0 → \(sourceApp.windowID), key=\(sourceApp.bindingKey)")
+        return true
+    }
+
+    /// 如果超過上限，淘汰一個 panel
+    /// 排名制：文字排名(x1.5) + 時間排名，前 3 取字數最少的淘汰
+    func evictIfNeeded() {
+        let maxCount = SettingsManager.shared.maxPanelCount
+        guard bindings.count >= maxCount else { return }
+
+        let n = bindings.count
+
+        // 文字排名：字少的排名低（1 = 最少）
+        let sortedByText = (0..<n).sorted { bindings[$0].panel.text.count < bindings[$1].panel.text.count }
+        var textRank = [Int](repeating: 0, count: n)
+        for (rank, idx) in sortedByText.enumerated() {
+            textRank[idx] = rank + 1
+        }
+
+        // 時間排名：隱藏最久的排名低（1 = 最久）
+        let now = Date()
+        let sortedByTime = (0..<n).sorted {
+            let t0 = bindings[$0].panel.hiddenSince ?? now
+            let t1 = bindings[$1].panel.hiddenSince ?? now
+            return t0 < t1  // 較早隱藏的排前面
+        }
+        var timeRank = [Int](repeating: 0, count: n)
+        for (rank, idx) in sortedByTime.enumerated() {
+            timeRank[idx] = rank + 1
+        }
+
+        // 加權總分
+        let textWeight = 1.5
+        var scores: [(score: Double, index: Int)] = []
+        for i in 0..<n {
+            let score = Double(textRank[i]) * textWeight + Double(timeRank[i])
+            scores.append((score, i))
+        }
+
+        // 排序取前 3（分數最低的）
+        scores.sort { $0.score < $1.score }
+        let top3 = Array(scores.prefix(3))
+
+        // 從前 3 中挑字數最少的，字數相同挑隱藏最久的
+        let evictIdx = top3.min { a, b in
+            let textA = bindings[a.index].panel.text.count
+            let textB = bindings[b.index].panel.text.count
+            if textA != textB { return textA < textB }
+            let timeA = bindings[a.index].panel.hiddenSince ?? now
+            let timeB = bindings[b.index].panel.hiddenSince ?? now
+            return timeA < timeB
+        }!.index
+
+        let panel = bindings[evictIdx].panel
+        NSLog("WindowManager: 淘汰 panel（文字\(panel.text.count)字）")
+        bindings.remove(at: evictIdx)
+        // 直接 close，不走 hidePanel 避免觸發 delegate 焦點切換
+        panel.isClosingProgrammatically = true
+        panel.close()
     }
 
     /// 移除指定的 InputPanel 綁定
@@ -83,6 +143,9 @@ class WindowManager {
             let hasText = !binding.panel.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             if hasText {
                 binding.panel.orderOut(nil)
+                if binding.panel.hiddenSince == nil {
+                    binding.panel.hiddenSince = Date()
+                }
             } else {
                 toClose.append(binding.panel)
             }

@@ -29,6 +29,7 @@ class SettingsManager {
         static let lastWindowY = "lastWindowY"
         static let windowAlpha = "windowAlpha"
         static let fontSize = "fontSize"
+        static let maxPanelCount = "maxPanelCount"
     }
 
     // MARK: - 設定變更通知
@@ -93,6 +94,18 @@ class SettingsManager {
             defaults.set(clamped, forKey: Keys.windowAlpha)
             // 發送通知，讓已開啟的窗口即時更新
             NotificationCenter.default.post(name: Self.windowAlphaDidChangeNotification, object: nil)
+        }
+    }
+
+    /// 取得/設定窗口上限數量 (5-50)
+    var maxPanelCount: Int {
+        get {
+            let value = defaults.integer(forKey: Keys.maxPanelCount)
+            return value > 0 ? value : 20  // 預設 20
+        }
+        set {
+            let clamped = min(max(newValue, 5), 50)
+            defaults.set(clamped, forKey: Keys.maxPanelCount)
         }
     }
 }

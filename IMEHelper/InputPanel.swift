@@ -50,6 +50,9 @@ class InputPanel: NSPanel {
     /// 是否為孤立狀態（目標視窗已關閉，不受 hideAll 影響）
     var isOrphaned = false
 
+    /// 隱藏開始的時間（用於淘汰分數計算）
+    var hiddenSince: Date?
+
     /// 是否被使用者手動隱藏（快捷鍵 toggle off）
     var isManuallyHidden: Bool = false
 
@@ -292,6 +295,7 @@ class InputPanel: NSPanel {
         isProgrammaticMove = false
 
         // 顯示窗口並取得焦點
+        hiddenSince = nil
         NSLog("InputPanel: 準備顯示窗口，位置 x=\(self.frame.origin.x), y=\(self.frame.origin.y)")
         self.makeKeyAndOrderFront(nil)
 

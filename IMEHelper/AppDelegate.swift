@@ -152,6 +152,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
                 if binding.panel.isVisible {
                     binding.panel.orderOut(nil)
                     binding.panel.isManuallyHidden = true
+                    binding.panel.hiddenSince = Date()
                     didHide = true
                     // 歸還焦點給該 panel 的來源 app
                     if let info = binding.panel.sourceAppInfo,
@@ -168,16 +169,18 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
             return
         }
 
+        // 先嘗試補回 windowID == 0 的 binding（讓後續 find 能匹配）
+        windowManager.migrateIfNeeded(for: sourceApp)
+
         // 檢查是否已有對應的窗口（含 fallback 匹配）
         if let existingPanel = windowManager.findWithFallback(for: sourceApp) {
             existingPanel.setSourceApp(sourceApp)
-            // 順便嘗試補回 windowID
-            windowManager.migrateIfNeeded(for: sourceApp)
 
             if existingPanel.isVisible {
                 // 窗口已顯示 → 隱藏（toggle）
                 existingPanel.orderOut(nil)
                 existingPanel.isManuallyHidden = true
+                existingPanel.hiddenSince = Date()
                 // 歸還焦點給來源 app
                 if let app = NSRunningApplication(processIdentifier: sourceApp.pid) {
                     app.activate(options: [])
@@ -185,6 +188,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
             } else {
                 // 窗口存在但隱藏中 → 重新顯示
                 existingPanel.isManuallyHidden = false
+                existingPanel.hiddenSince = nil
                 lastFrontmostKey = sourceApp.bindingKey
                 NSApp.activate(ignoringOtherApps: true)
                 existingPanel.makeKeyAndOrderFront(nil)
@@ -193,7 +197,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
             return
         }
 
-        // 沒有對應窗口 → 新建
+        // 沒有對應窗口 → 新建（先檢查上限）
+        windowManager.evictIfNeeded()
         let caretInfo = CaretPositionHelper.getCaretPosition()
         let panel = InputPanel()
         panel.panelDelegate = self
@@ -207,7 +212,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
 
         // 如果 windowID == 0，啟動 retry 嘗試補回
         if sourceApp.windowID == 0 {
-            retryWindowID(pid: sourceApp.pid)
+            retryWindowID(pid: sourceApp.pid, panel: panel)
         }
 
         // 背景 app 需要先 activate 才能顯示視窗
@@ -221,18 +226,19 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
     }
 
     /// windowID == 0 時的 retry（50ms / 150ms / 300ms）
-    private func retryWindowID(pid: pid_t) {
+    private func retryWindowID(pid: pid_t, panel: InputPanel) {
         for delay in [0.05, 0.15, 0.3] {
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
-                guard let self = self else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self, weak panel] in
+                guard let self = self, let panel = panel else { return }
 
                 // 重新取得來源 app 資訊
                 guard let sourceApp = SourceAppInfo.fromApp(pid: pid),
                       sourceApp.windowID != 0 else { return }
 
-                // 補回 windowID
-                self.windowManager.migrateIfNeeded(for: sourceApp)
-                self.lastFrontmostKey = sourceApp.bindingKey
+                // 補回 binding 的 windowID，成功才更新 panel
+                if self.windowManager.migrateIfNeeded(for: sourceApp) {
+                    panel.setSourceApp(sourceApp)
+                }
             }
         }
     }
@@ -285,6 +291,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
         // 檢查已關閉的視窗
         handleClosedWindows()
 
+        // handleClosedWindows 可能 activate IMEHelper（顯示 orphan panel），重新檢查前景
+        guard let currentFront = NSWorkspace.shared.frontmostApplication,
+              currentFront.processIdentifier != ProcessInfo.processInfo.processIdentifier else {
+            return
+        }
+
         // 取得當前前景視窗資訊
         guard let sourceApp = SourceAppInfo.fromFrontmostApp() else {
             return
@@ -324,7 +336,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
                 panel.makeKeyAndOrderFront(nil)
                 panel.focusTextView()
             } else {
-                panel.hidePanel()
+                // 空 panel 直接 close，不走 delegate 避免焦點回跳
+                panel.isClosingProgrammatically = true
+                panel.close()
             }
         }
     }
@@ -355,6 +369,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
            !existingPanel.text.isEmpty,
            !existingPanel.isManuallyHidden {
             existingPanel.setSourceApp(sourceApp)
+            existingPanel.hiddenSince = nil
             NSApp.activate(ignoringOtherApps: true)
             existingPanel.makeKeyAndOrderFront(nil)
             existingPanel.focusTextView()
