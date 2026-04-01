@@ -170,11 +170,15 @@ struct SourceAppInfo {
 
         guard let content = val as? String, !content.isEmpty else { return "" }
 
-        // 搜尋 Last login 行（含時間戳和 tty，整行作為唯一識別）
-        if let range = content.range(of: #"Last login:.*on ttys\d+"#, options: .regularExpression) {
-            return String(content[range])
+        // 只在前 200 字元內搜尋 Last login 行（真正的登入訊息一定在 buffer 開頭）
+        let searchArea = String(content.prefix(200))
+        if let range = searchArea.range(of: #"Last login:.*on ttys\d+"#, options: .regularExpression) {
+            let result = String(searchArea[range])
+            NSLog("loginLine提取: 結果=\(result), 內容長度=\(content.count)")
+            return result
         }
 
+        NSLog("loginLine提取: 未找到（前200字無匹配）, 內容長度=\(content.count)")
         return ""
     }
 

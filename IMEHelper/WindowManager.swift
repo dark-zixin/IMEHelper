@@ -15,9 +15,31 @@ class WindowManager {
     private var bindings: [WindowBinding] = []
 
     /// 根據來源 app 資訊查詢已存在的窗口（精確匹配 bindingKey）
-    /// 精確匹配 bindingKey
+    /// 匹配 bindingKey（跳過 orphaned panel）
+    /// 精確匹配失敗且有 loginLine 時，用 pid + loginLine 匹配（忽略 windowID 差異）
     func find(for sourceApp: SourceAppInfo) -> InputPanel? {
-        return bindings.first(where: { $0.bindingKey == sourceApp.bindingKey })?.panel
+        // 精確匹配
+        if let exact = bindings.first(where: { $0.bindingKey == sourceApp.bindingKey && !$0.panel.isOrphaned }) {
+            return exact.panel
+        }
+
+        // loginLine fallback：有 loginLine 時，用 pid + loginLine 匹配
+        if !sourceApp.loginLine.isEmpty {
+            let loginKey = "|login:\(sourceApp.loginLine)"
+            if let match = bindings.first(where: {
+                $0.pid == sourceApp.pid && $0.bindingKey.contains(loginKey) && !$0.panel.isOrphaned
+            }) {
+                return match.panel
+            }
+        }
+
+        if !bindings.isEmpty {
+            NSLog("KEY比對失敗: 搜尋=\(sourceApp.bindingKey)")
+            for b in bindings {
+                NSLog("  存在: key=\(b.bindingKey), orphaned=\(b.panel.isOrphaned), text=\(b.panel.text.count)字")
+            }
+        }
+        return nil
     }
 
     /// 含 fallback 的查找（處理 tab bar 消失的情況）
@@ -31,7 +53,7 @@ class WindowManager {
         guard sourceApp.windowID != 0, sourceApp.tabDescription.isEmpty else { return nil }
 
         let candidates = bindings.filter {
-            $0.pid == sourceApp.pid && $0.windowID == sourceApp.windowID
+            $0.pid == sourceApp.pid && $0.windowID == sourceApp.windowID && !$0.panel.isOrphaned
         }
 
         guard candidates.count == 1 else { return nil }
@@ -73,59 +95,83 @@ class WindowManager {
 
     /// 如果超過上限，淘汰一個 panel
     /// 排名制：文字排名(x1.5) + 時間排名，前 3 取字數最少的淘汰
-    func evictIfNeeded() {
+    /// - Returns: true 表示可以繼續建新 panel，false 表示已顯示淘汰候選，不建新 panel
+    func evictIfNeeded() -> Bool {
         let maxCount = SettingsManager.shared.maxPanelCount
-        guard bindings.count >= maxCount else { return }
 
-        let n = bindings.count
+        // 用總 binding 數檢查（包含 orphaned），只要不關就不能再開
+        guard bindings.count >= maxCount else { return true }
+
+        // 如果已經有淘汰候選正在等使用者處理，不再淘汰新的
+        let hasOrphaned = bindings.contains { $0.panel.isOrphaned }
+        if hasOrphaned { return false }
+
+        // 排名只對非 orphaned 的做
+        let activeIndices = (0..<bindings.count).filter { !bindings[$0].panel.isOrphaned }
+
+        let n = activeIndices.count
+        let now = Date()
 
         // 文字排名：字少的排名低（1 = 最少）
-        let sortedByText = (0..<n).sorted { bindings[$0].panel.text.count < bindings[$1].panel.text.count }
+        let sortedByText = (0..<n).sorted {
+            bindings[activeIndices[$0]].panel.text.count < bindings[activeIndices[$1]].panel.text.count
+        }
         var textRank = [Int](repeating: 0, count: n)
-        for (rank, idx) in sortedByText.enumerated() {
-            textRank[idx] = rank + 1
+        for (rank, localIdx) in sortedByText.enumerated() {
+            textRank[localIdx] = rank + 1
         }
 
         // 時間排名：隱藏最久的排名低（1 = 最久）
-        let now = Date()
         let sortedByTime = (0..<n).sorted {
-            let t0 = bindings[$0].panel.hiddenSince ?? now
-            let t1 = bindings[$1].panel.hiddenSince ?? now
-            return t0 < t1  // 較早隱藏的排前面
+            let t0 = bindings[activeIndices[$0]].panel.hiddenSince ?? now
+            let t1 = bindings[activeIndices[$1]].panel.hiddenSince ?? now
+            return t0 < t1
         }
         var timeRank = [Int](repeating: 0, count: n)
-        for (rank, idx) in sortedByTime.enumerated() {
-            timeRank[idx] = rank + 1
+        for (rank, localIdx) in sortedByTime.enumerated() {
+            timeRank[localIdx] = rank + 1
         }
 
-        // 加權總分
+        // 加權總分（localIdx → score）
         let textWeight = 1.5
-        var scores: [(score: Double, index: Int)] = []
+        var scores: [(score: Double, localIdx: Int)] = []
         for i in 0..<n {
             let score = Double(textRank[i]) * textWeight + Double(timeRank[i])
             scores.append((score, i))
         }
 
-        // 排序取前 3（分數最低的）
+        // 排序取前 3
         scores.sort { $0.score < $1.score }
         let top3 = Array(scores.prefix(3))
 
         // 從前 3 中挑字數最少的，字數相同挑隱藏最久的
-        let evictIdx = top3.min { a, b in
-            let textA = bindings[a.index].panel.text.count
-            let textB = bindings[b.index].panel.text.count
+        let evictLocal = top3.min { a, b in
+            let textA = bindings[activeIndices[a.localIdx]].panel.text.count
+            let textB = bindings[activeIndices[b.localIdx]].panel.text.count
             if textA != textB { return textA < textB }
-            let timeA = bindings[a.index].panel.hiddenSince ?? now
-            let timeB = bindings[b.index].panel.hiddenSince ?? now
+            let timeA = bindings[activeIndices[a.localIdx]].panel.hiddenSince ?? now
+            let timeB = bindings[activeIndices[b.localIdx]].panel.hiddenSince ?? now
             return timeA < timeB
-        }!.index
+        }!.localIdx
 
-        let panel = bindings[evictIdx].panel
-        NSLog("WindowManager: 淘汰 panel（文字\(panel.text.count)字）")
-        bindings.remove(at: evictIdx)
-        // 直接 close，不走 hidePanel 避免觸發 delegate 焦點切換
-        panel.isClosingProgrammatically = true
-        panel.close()
+        let realIdx = activeIndices[evictLocal]
+        let panel = bindings[realIdx].panel
+        let hasText = !panel.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        NSLog("WindowManager: 淘汰 panel（文字\(panel.text.count)字, hasText=\(hasText)）")
+
+        if hasText {
+            // 有文字：保留 binding（維持 count），標記為候選讓使用者決定
+            panel.markAsEvictionCandidate()
+            NSApp.activate(ignoringOtherApps: true)
+            panel.makeKeyAndOrderFront(nil)
+            return false
+        } else {
+            // 空文字：移除 binding 並 close，可以繼續建新 panel
+            bindings.remove(at: realIdx)
+            panel.isClosingProgrammatically = true
+            panel.close()
+            return true
+        }
     }
 
     /// 移除指定的 InputPanel 綁定

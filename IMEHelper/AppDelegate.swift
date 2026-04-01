@@ -149,7 +149,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
             // 找到任何可見的 panel 並隱藏它
             var didHide = false
             for binding in windowManager.allBindings {
-                if binding.panel.isVisible {
+                if binding.panel.isVisible && !binding.panel.isOrphaned {
                     binding.panel.orderOut(nil)
                     binding.panel.isManuallyHidden = true
                     binding.panel.hiddenSince = Date()
@@ -198,13 +198,17 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
         }
 
         // 沒有對應窗口 → 新建（先檢查上限）
-        windowManager.evictIfNeeded()
+        guard windowManager.evictIfNeeded() else {
+            // 已達上限且顯示了淘汰候選，不建新 panel
+            return
+        }
         let caretInfo = CaretPositionHelper.getCaretPosition()
         let panel = InputPanel()
         panel.panelDelegate = self
         panel.setSourceApp(sourceApp)
 
         // 綁定到 WindowManager
+        NSLog("新建 panel: key=\(sourceApp.bindingKey)")
         windowManager.bind(panel: panel, to: sourceApp)
 
         // 更新追蹤 key，防止 timer 把剛顯示的 panel 當成「標題變化」隱藏掉

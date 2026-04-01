@@ -231,6 +231,13 @@ class InputPanel: NSPanel {
         self.title = "⚠ 目標視窗已關閉 — 請手動複製文字後關閉"
     }
 
+    /// 標記為淘汰候選，更新標題列提示讓使用者決定
+    func markAsEvictionCandidate() {
+        isOrphaned = true  // 不受 hideAll 影響
+        sourceAppInfo = nil  // 清掉來源，關閉時不切焦點
+        self.title = "⚠ 窗口數量已達上限 — 請複製文字後關閉以釋放空間"
+    }
+
     /// 設定來源 app 資訊（更新標題列顯示）
     func setSourceApp(_ info: SourceAppInfo) {
         sourceAppInfo = info
@@ -497,6 +504,11 @@ class InputPanel: NSPanel {
 extension InputPanel: InputTextViewDelegate {
 
     func inputTextViewDidPressEnter(_ textView: InputTextView) {
+        // 淘汰候選或孤立 panel 不能送出，只能複製和關閉
+        if isOrphaned {
+            return
+        }
+
         let trimmed = textView.string.trimmingCharacters(in: .whitespacesAndNewlines)
 
         guard !trimmed.isEmpty else {
