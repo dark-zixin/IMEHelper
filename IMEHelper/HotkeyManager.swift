@@ -14,6 +14,9 @@ class HotkeyManager {
     /// 快捷鍵被觸發時的 callback
     var onHotkeyPressed: (() -> Void)?
 
+    /// 帶 Cmd/Ctrl 修飾鍵的按鍵事件 callback（可能是切換視窗/分頁的操作）
+    var onSwitchKeyPressed: (() -> Void)?
+
     /// 事件 tap 的參考，用於啟停控制和外部檢查是否啟動成功
     private(set) var eventTap: CFMachPort?
 
@@ -116,31 +119,39 @@ private func hotkeyEventCallback(
         return Unmanaged.passUnretained(event)
     }
 
-    // 檢查修飾鍵：Cmd + Shift（不含其他修飾鍵）
     let flags = event.flags
-    let requiredFlags: CGEventFlags = [.maskCommand, .maskShift]
-    let hasRequired = flags.contains(requiredFlags)
-    let hasExtra = flags.contains(.maskControl) || flags.contains(.maskAlternate)
-
-    guard hasRequired && !hasExtra else {
-        return Unmanaged.passUnretained(event)
-    }
-
-    // 檢查按鍵是否為 Space（keyCode = 49）
+    let hasCmd = flags.contains(.maskCommand)
+    let hasShift = flags.contains(.maskShift)
+    let hasCtrl = flags.contains(.maskControl)
+    let hasAlt = flags.contains(.maskAlternate)
     let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
-    guard keyCode == 49 else {
-        return Unmanaged.passUnretained(event)
+
+    // 檢查快捷鍵：Cmd + Shift + Space（不含 Ctrl、Option）
+    if hasCmd && hasShift && !hasCtrl && !hasAlt && keyCode == 49 {
+        if let userInfo = userInfo {
+            let manager = Unmanaged<HotkeyManager>.fromOpaque(userInfo).takeUnretainedValue()
+            DispatchQueue.main.async {
+                manager.onHotkeyPressed?()
+            }
+        }
+        // 攔截此事件，不傳遞給其他 app
+        return nil
     }
 
-    // 觸發快捷鍵 callback
-    if let userInfo = userInfo {
-        let manager = Unmanaged<HotkeyManager>.fromOpaque(userInfo).takeUnretainedValue()
-        // 回到主執行緒執行 callback
-        DispatchQueue.main.async {
-            manager.onHotkeyPressed?()
+    // 帶 Cmd 或 Ctrl 的 keyDown（可能是切換視窗/分頁的操作）
+    // 排除不會切換分頁的常用編輯按鍵：A(0) S(1) Z(6) X(7) C(8) V(9)
+    // 過濾 key repeat（長按不重複觸發）
+    let editingKeys: Set<Int64> = [0, 1, 6, 7, 8, 9]
+    let isRepeat = event.getIntegerValueField(.keyboardEventAutorepeat) != 0
+    if (hasCmd || hasCtrl) && !isRepeat && !editingKeys.contains(keyCode) {
+        if let userInfo = userInfo {
+            let manager = Unmanaged<HotkeyManager>.fromOpaque(userInfo).takeUnretainedValue()
+            DispatchQueue.main.async {
+                manager.onSwitchKeyPressed?()
+            }
         }
     }
 
-    // 攔截此事件，不傳遞給其他 app
-    return nil
+    // 放行事件，不攔截
+    return Unmanaged.passUnretained(event)
 }

@@ -23,7 +23,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
     // 文字回填注入器
     private var textInjector = TextInjector()
 
-    // 視窗標題變化偵測計時器
+    // 慢速 timer（已關閉視窗清理 + 兜底偵測）
     private var windowTitleCheckTimer: Timer?
 
     // 上次偵測到的前景視窗標題和 PID
@@ -31,6 +31,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
 
     // 文字回填進行中旗標，抑制自動恢復
     private var isInjecting: Bool = false
+
+    // scheduleCheck 防重複執行旗標
+    private var isChecking = false
+    private var needsRecheck = false
 
     func applicationDidFinishLaunching(_ aNotification: Notification) {
         // 建立 Menu Bar 圖示
@@ -50,8 +54,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
             object: nil
         )
 
-        // 啟動視窗標題變化偵測（每 0.5 秒檢查一次，偵測同 app 內的視窗/分頁切換）
+        // 啟動慢速 timer（兜底偵測 + 已關閉視窗清理）
         startWindowTitleMonitor()
+
+        // 監聽滑鼠點擊（偵測同 app 內的視窗/分頁切換）
+        NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDown) { [weak self] _ in
+            self?.scheduleCheck()
+        }
     }
 
     func applicationWillTerminate(_ aNotification: Notification) {
@@ -108,6 +117,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
         hotkeyManager = HotkeyManager()
         hotkeyManager.onHotkeyPressed = { [weak self] in
             self?.handleHotkeyPressed()
+        }
+        hotkeyManager.onSwitchKeyPressed = { [weak self] in
+            self?.scheduleCheck()
         }
         hotkeyManager.start()
 
@@ -274,30 +286,42 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
         }
     }
 
-    // MARK: - 視窗標題變化偵測
+    // MARK: - 事件驅動分頁偵測
 
-    /// 啟動定時檢查前景視窗標題（偵測同 app 內的視窗/分頁切換）
+    /// 啟動慢速 timer（兜底偵測 + 已關閉視窗清理）
+    /// 主要偵測由滑鼠/鍵盤監聽驅動，此 timer 負責：
+    /// 1. 定期清理已關閉的視窗
+    /// 2. 兜底偵測非 Cmd/Ctrl 的分頁切換（如觸控板手勢）
     private func startWindowTitleMonitor() {
-        windowTitleCheckTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
-            self?.checkWindowTitleChange()
+        windowTitleCheckTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { [weak self] _ in
+            self?.scheduleCheck()
         }
     }
 
-    /// 檢查前景視窗標題是否變化，觸發隱藏/恢復；同時檢查視窗是否還存在
+    /// 事件驅動的分頁變化檢查（防重複執行）
+    /// 滑鼠點擊、鍵盤操作、慢速 timer 都透過此方法觸發檢查
+    private func scheduleCheck() {
+        if isChecking {
+            needsRecheck = true
+            return
+        }
+        isChecking = true
+        handleClosedWindows()
+        checkWindowTitleChange()
+        if needsRecheck {
+            needsRecheck = false
+            handleClosedWindows()
+            checkWindowTitleChange()
+        }
+        isChecking = false
+    }
+
+    /// 檢查前景視窗標題是否變化，觸發隱藏/恢復
     private func checkWindowTitleChange() {
         // 正在回填中或自己是前景 app，不做處理
         guard !isInjecting,
               let frontApp = NSWorkspace.shared.frontmostApplication,
               frontApp.processIdentifier != ProcessInfo.processInfo.processIdentifier else {
-            return
-        }
-
-        // 檢查已關閉的視窗
-        handleClosedWindows()
-
-        // handleClosedWindows 可能 activate IMEHelper（顯示 orphan panel），重新檢查前景
-        guard let currentFront = NSWorkspace.shared.frontmostApplication,
-              currentFront.processIdentifier != ProcessInfo.processInfo.processIdentifier else {
             return
         }
 
