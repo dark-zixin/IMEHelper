@@ -312,6 +312,7 @@ struct PanelManagerView: View {
             }
         }
         .focusable()
+        .focusEffectDisabled()
         .onKeyPress { keyPress in
             guard keyPress.modifiers == .command else { return .ignored }
             switch keyPress.characters {
@@ -457,6 +458,7 @@ struct TestNSTextViewContentView: View {
             }
         }
         .focusable()
+        .focusEffectDisabled()
         .onKeyPress { keyPress in
             guard keyPress.modifiers == .command else { return .ignored }
             switch keyPress.characters {
