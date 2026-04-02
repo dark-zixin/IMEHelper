@@ -108,6 +108,9 @@ struct PanelManagerView: View {
     /// 全域字型大小
     @State private var fontSize: CGFloat = SettingsManager.shared.fontSize
 
+    /// 最近複製的項目 ID（用於顯示「已複製」提示）
+    @State private var copiedId: String?
+
     /// 確認對話框狀態
     @State private var showCloseAllAlert = false
     @State private var showCloseOrphanedAlert = false
@@ -189,6 +192,14 @@ struct PanelManagerView: View {
                                     // 按鈕
                                     HStack(spacing: 4) {
                                         Button("關閉") {
+                                            // 關閉真實 panel 並清除 binding（不觸發焦點回跳）
+                                            if let appDelegate = NSApp.delegate as? AppDelegate,
+                                               let binding = appDelegate.windowManager.allBindings.first(where: { $0.bindingKey == item.id }) {
+                                                let panel = binding.panel
+                                                panel.isClosingProgrammatically = true
+                                                panel.close()
+                                                appDelegate.windowManager.remove(panel: panel)
+                                            }
                                             withAnimation {
                                                 items.removeAll { $0.id == item.id }
                                                 if expandedId == item.id {
@@ -198,9 +209,15 @@ struct PanelManagerView: View {
                                         }
                                         .font(.system(size: 11))
 
-                                        Button("複製") {
+                                        Button(copiedId == item.id ? "已複製" : "複製") {
                                             NSPasteboard.general.clearContents()
                                             NSPasteboard.general.setString(item.fullText, forType: .string)
+                                            copiedId = item.id
+                                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                                                if copiedId == item.id {
+                                                    copiedId = nil
+                                                }
+                                            }
                                         }
                                         .font(.system(size: 11))
                                     }
@@ -237,6 +254,17 @@ struct PanelManagerView: View {
                     }
                     .alert("確定要關閉所有窗口嗎？", isPresented: $showCloseAllAlert) {
                         Button("關閉全部", role: .destructive) {
+                            // 關閉所有真實 panel 並清除 binding（不觸發焦點回跳）
+                            if let appDelegate = NSApp.delegate as? AppDelegate {
+                                for item in items {
+                                    if let binding = appDelegate.windowManager.allBindings.first(where: { $0.bindingKey == item.id }) {
+                                        let panel = binding.panel
+                                        panel.isClosingProgrammatically = true
+                                        panel.close()
+                                        appDelegate.windowManager.remove(panel: panel)
+                                    }
+                                }
+                            }
                             withAnimation {
                                 items.removeAll()
                                 expandedId = nil
@@ -253,6 +281,17 @@ struct PanelManagerView: View {
                     .disabled(!items.contains { $0.isOrphaned })
                     .alert("確定要關閉所有孤立窗口嗎？", isPresented: $showCloseOrphanedAlert) {
                         Button("關閉孤立", role: .destructive) {
+                            // 關閉所有孤立的真實 panel 並清除 binding（不觸發焦點回跳）
+                            if let appDelegate = NSApp.delegate as? AppDelegate {
+                                for item in items where item.isOrphaned {
+                                    if let binding = appDelegate.windowManager.allBindings.first(where: { $0.bindingKey == item.id }) {
+                                        let panel = binding.panel
+                                        panel.isClosingProgrammatically = true
+                                        panel.close()
+                                        appDelegate.windowManager.remove(panel: panel)
+                                    }
+                                }
+                            }
                             withAnimation {
                                 items.removeAll { $0.isOrphaned }
                                 if let id = expandedId, !items.contains(where: { $0.id == id }) {
