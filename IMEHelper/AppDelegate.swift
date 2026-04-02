@@ -7,6 +7,7 @@
 
 import Cocoa
 import ApplicationServices
+import SwiftUI
 
 @main
 class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
@@ -96,6 +97,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
         panelManagerItem.target = self
         menu.addItem(panelManagerItem)
 
+        // 測試 NSTextView（暫時）
+        let testItem = NSMenuItem(title: "NSTextView 測試...", action: #selector(openNSTextViewTest(_:)), keyEquivalent: "")
+        testItem.target = self
+        menu.addItem(testItem)
+
         menu.addItem(NSMenuItem.separator())
 
         // 結束應用程式
@@ -119,6 +125,31 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
     /// 開啟窗口管理視窗
     @objc private func openPanelManager(_ sender: Any?) {
         PanelManagerWindowController.show()
+    }
+
+    /// 測試 NSTextView 在 SwiftUI 中的顯示（暫時）
+    private var testWindow: NSWindow?
+    @objc private func openNSTextViewTest(_ sender: Any?) {
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 500, height: 400),
+            styleMask: [.titled, .closable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = "NSTextView 測試"
+        window.center()
+
+        let testView = TestNSTextViewContentView()
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        let hostingController = NSHostingController(rootView: testView)
+        hostingController.sizingOptions = []
+        window.contentViewController = hostingController
+        // 設定 contentViewController 後恢復視窗大小（避免被壓縮）
+        window.setFrame(NSRect(x: 0, y: 0, width: 800, height: 500), display: false)
+        window.center()
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        testWindow = window  // 防止被釋放
     }
 
     // MARK: - 全域快捷鍵
