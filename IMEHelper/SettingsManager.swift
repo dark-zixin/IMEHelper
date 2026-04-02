@@ -30,6 +30,8 @@ class SettingsManager {
         static let windowAlpha = "windowAlpha"
         static let fontSize = "fontSize"
         static let maxPanelCount = "maxPanelCount"
+        static let hotkeyKeyCode = "hotkeyKeyCode"
+        static let hotkeyModifierFlags = "hotkeyModifierFlags"
     }
 
     // MARK: - 設定變更通知
@@ -39,6 +41,9 @@ class SettingsManager {
 
     /// 字型大小變更通知
     static let fontSizeDidChangeNotification = Notification.Name("SettingsManager.fontSizeDidChange")
+
+    /// 快捷鍵變更通知
+    static let hotkeyDidChangeNotification = Notification.Name("SettingsManager.hotkeyDidChange")
 
     /// 取得/設定窗口位置模式
     var windowPositionMode: WindowPositionMode {
@@ -96,6 +101,48 @@ class SettingsManager {
             NotificationCenter.default.post(name: Self.windowAlphaDidChangeNotification, object: nil)
         }
     }
+
+    // MARK: - 快捷鍵設定
+
+    /// 預設快捷鍵：Cmd + Shift + Space
+    static let defaultHotkeyKeyCode: Int64 = 49
+    static let defaultHotkeyModifierFlags: UInt64 = CGEventFlags.maskCommand.rawValue | CGEventFlags.maskShift.rawValue
+
+    /// 取得/設定快捷鍵的 keyCode
+    var hotkeyKeyCode: Int64 {
+        get {
+            let value = defaults.object(forKey: Keys.hotkeyKeyCode)
+            return value != nil ? Int64(defaults.integer(forKey: Keys.hotkeyKeyCode)) : Self.defaultHotkeyKeyCode
+        }
+        set {
+            defaults.set(Int(newValue), forKey: Keys.hotkeyKeyCode)
+        }
+    }
+
+    /// 取得/設定快捷鍵的修飾鍵 flags（存為 UInt64）
+    var hotkeyModifierFlags: UInt64 {
+        get {
+            let value = defaults.object(forKey: Keys.hotkeyModifierFlags)
+            return value != nil ? UInt64(defaults.integer(forKey: Keys.hotkeyModifierFlags)) : Self.defaultHotkeyModifierFlags
+        }
+        set {
+            defaults.set(Int(newValue), forKey: Keys.hotkeyModifierFlags)
+        }
+    }
+
+    /// 設定快捷鍵並發送通知
+    func setHotkey(keyCode: Int64, modifierFlags: UInt64) {
+        hotkeyKeyCode = keyCode
+        hotkeyModifierFlags = modifierFlags
+        NotificationCenter.default.post(name: Self.hotkeyDidChangeNotification, object: nil)
+    }
+
+    /// 重設快捷鍵為預設值
+    func resetHotkey() {
+        setHotkey(keyCode: Self.defaultHotkeyKeyCode, modifierFlags: Self.defaultHotkeyModifierFlags)
+    }
+
+    // MARK: - 窗口上限
 
     /// 取得/設定窗口上限數量 (5-50)
     var maxPanelCount: Int {

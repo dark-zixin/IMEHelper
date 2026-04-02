@@ -15,7 +15,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
     private var statusItem: NSStatusItem!
 
     // 全域快捷鍵管理器
-    private var hotkeyManager: HotkeyManager!
+    // 全域快捷鍵管理器（SettingsWindowController 的 delegate 需要存取）
+    private(set) var hotkeyManager: HotkeyManager!
 
     // 多窗口管理器
     private var windowManager = WindowManager()
