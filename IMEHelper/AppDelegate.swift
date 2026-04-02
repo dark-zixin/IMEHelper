@@ -18,8 +18,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
     // 全域快捷鍵管理器（SettingsWindowController 的 delegate 需要存取）
     private(set) var hotkeyManager: HotkeyManager!
 
-    // 多窗口管理器
-    private var windowManager = WindowManager()
+    // 多窗口管理器（PanelManagerWindowController 需要存取）
+    private(set) var windowManager = WindowManager()
 
     // 文字回填注入器
     private var textInjector = TextInjector()
@@ -91,6 +91,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
         settingsItem.target = self
         menu.addItem(settingsItem)
 
+        // 窗口管理
+        let panelManagerItem = NSMenuItem(title: "窗口管理...", action: #selector(openPanelManager(_:)), keyEquivalent: "")
+        panelManagerItem.target = self
+        menu.addItem(panelManagerItem)
+
         menu.addItem(NSMenuItem.separator())
 
         // 結束應用程式
@@ -109,6 +114,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
     /// 開啟設定視窗
     @objc private func openSettings(_ sender: Any?) {
         SettingsWindowController.show()
+    }
+
+    /// 開啟窗口管理視窗
+    @objc private func openPanelManager(_ sender: Any?) {
+        PanelManagerWindowController.show()
     }
 
     // MARK: - 全域快捷鍵

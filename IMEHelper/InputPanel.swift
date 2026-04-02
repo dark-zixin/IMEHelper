@@ -47,6 +47,12 @@ class InputPanel: NSPanel {
     /// 來源 app 資訊
     private(set) var sourceAppInfo: SourceAppInfo?
 
+    /// 最後記錄的 app 名稱（orphan 後 sourceAppInfo 被清空，但 appName 保留）
+    private(set) var lastAppName: String = ""
+
+    /// 最後記錄的視窗標題
+    private(set) var lastWindowTitle: String = ""
+
     /// 是否為孤立狀態（目標視窗已關閉，不受 hideAll 影響）
     var isOrphaned = false
 
@@ -244,6 +250,8 @@ class InputPanel: NSPanel {
     /// 設定來源 app 資訊（更新標題列顯示）
     func setSourceApp(_ info: SourceAppInfo) {
         sourceAppInfo = info
+        lastAppName = info.appName
+        lastWindowTitle = info.windowTitle
 
         if info.windowTitle.isEmpty {
             self.title = "輸入到：\(info.appName)"
