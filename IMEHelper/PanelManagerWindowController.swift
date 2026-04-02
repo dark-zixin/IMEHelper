@@ -306,16 +306,7 @@ struct PanelRowView: View {
 
             // 展開時顯示完整文字（可捲動，最大 200px）
             if isExpanded {
-                ScrollView {
-                    Text(item.fullText)
-                        .font(.system(size: 12))
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(8)
-                }
-                .frame(maxHeight: 200)
-                .background(Color(nsColor: .controlBackgroundColor))
-                .cornerRadius(4)
+                ExpandedTextContent(fullText: item.fullText)
             }
         }
         .contentShape(Rectangle())
@@ -323,6 +314,33 @@ struct PanelRowView: View {
             onToggleExpand()
         }
         .padding(.vertical, 4)
+    }
+}
+
+// MARK: - 展開文字（懶載入）
+
+/// 展開的完整文字內容，先顯示框架再載入文字，避免大量文字阻塞 UI
+struct ExpandedTextContent: View {
+    let fullText: String
+    @State private var displayText: String = ""
+
+    var body: some View {
+        ScrollView {
+            Text(displayText)
+                .font(.system(size: 12))
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(8)
+        }
+        .frame(maxHeight: 200)
+        .background(Color(nsColor: .controlBackgroundColor))
+        .cornerRadius(4)
+        .onAppear {
+            // 延遲載入文字，讓展開動畫先完成
+            DispatchQueue.main.async {
+                displayText = fullText
+            }
+        }
     }
 }
 
