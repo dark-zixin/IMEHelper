@@ -97,10 +97,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
         panelManagerItem.target = self
         menu.addItem(panelManagerItem)
 
-        // 測試 NSTextView（暫時）
-        let testItem = NSMenuItem(title: "NSTextView 測試...", action: #selector(openNSTextViewTest(_:)), keyEquivalent: "")
-        testItem.target = self
-        menu.addItem(testItem)
+
 
         menu.addItem(NSMenuItem.separator())
 
@@ -125,31 +122,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
     /// 開啟窗口管理視窗
     @objc private func openPanelManager(_ sender: Any?) {
         PanelManagerWindowController.show()
-    }
-
-    /// 測試 NSTextView 在 SwiftUI 中的顯示（暫時）
-    private var testWindow: NSWindow?
-    @objc private func openNSTextViewTest(_ sender: Any?) {
-        let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 500, height: 400),
-            styleMask: [.titled, .closable, .resizable],
-            backing: .buffered,
-            defer: false
-        )
-        window.title = "NSTextView 測試"
-        window.center()
-
-        let testView = TestNSTextViewContentView()
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        let hostingController = NSHostingController(rootView: testView)
-        hostingController.sizingOptions = []
-        window.contentViewController = hostingController
-        // 設定 contentViewController 後恢復視窗大小（避免被壓縮）
-        window.setFrame(NSRect(x: 0, y: 0, width: 800, height: 500), display: false)
-        window.center()
-        window.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
-        testWindow = window  // 防止被釋放
     }
 
     // MARK: - 全域快捷鍵
@@ -318,9 +290,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
         // 隱藏所有可見的 InputPanel
         windowManager.hideAll()
 
-        // 清理已關閉的 app 的綁定
-        let cleanedPanels = windowManager.cleanupTerminatedApps()
-        handleOrphanedPanels(cleanedPanels)
+        // 清理已關閉的 app（標記孤立或關閉空 panel）
+        windowManager.cleanupTerminatedApps()
 
         // 延遲取得視窗標題，嘗試自動恢復
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
@@ -391,26 +362,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
 
     /// 檢查並處理已關閉視窗的 panel
     private func handleClosedWindows() {
-        let closedWindowPanels = windowManager.cleanupClosedWindows()
-        handleOrphanedPanels(closedWindowPanels)
-    }
-
-    /// 統一處理孤立 panel（目標視窗/app 已關閉）
-    private func handleOrphanedPanels(_ panels: [InputPanel]) {
-        for panel in panels {
-            let hasText = !panel.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            if hasText {
-                // 標記為孤立，更新標題列提示，顯示 panel 讓使用者複製
-                panel.markAsOrphaned()
-                NSApp.activate(ignoringOtherApps: true)
-                panel.makeKeyAndOrderFront(nil)
-                panel.focusTextView()
-            } else {
-                // 空 panel 直接 close，不走 delegate 避免焦點回跳
-                panel.isClosingProgrammatically = true
-                panel.close()
-            }
-        }
+        windowManager.cleanupClosedWindows()
     }
 
     private func tryRestorePanel() {
@@ -460,8 +412,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
         // 檢查目標 app 是否還存在
         guard let targetApp = NSRunningApplication(processIdentifier: sourceInfo.pid),
               !targetApp.isTerminated else {
-            // 目標已關閉，標記為孤立
-            windowManager.remove(panel: panel)
+            // 目標已關閉，標記為孤立（保留 binding，讓管理視窗能看到）
             panel.markAsOrphaned()
             return
         }
@@ -486,8 +437,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
         // 設定回填旗標，抑制自動恢復
         isInjecting = true
 
-        // 先移除綁定，避免回填過程中被自動恢復
-        windowManager.remove(panel: panel)
+        // 標記為孤立狀態，避免回填過程中被 hideAll/tryRestore 干擾
+        panel.isOrphaned = true
 
         // 隱藏視窗（但保留文字，等回填成功後才清空）
         panel.orderOut(nil)
@@ -499,12 +450,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
             self.isInjecting = false
 
             if success {
-                // 回填成功，清空文字並關閉 panel
+                // 回填成功，清空文字、移除綁定、關閉 panel
                 panel.text = ""
+                panel.isOrphaned = false
+                self.windowManager.remove(panel: panel)
                 panel.hidePanel()
                 NSLog("AppDelegate: 文字回填完成")
             } else {
-                // 回填失敗，標記為孤立並重新顯示
+                // 回填失敗，標記為孤立並重新顯示（binding 保留，管理視窗可看到）
                 panel.markAsOrphaned()
                 NSApp.activate(ignoringOtherApps: true)
                 panel.makeKeyAndOrderFront(nil)

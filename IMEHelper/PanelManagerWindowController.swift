@@ -158,9 +158,11 @@ struct PanelManagerView: View {
                 Spacer()
             } else {
                 // 列表（ScrollView + LazyVStack，平滑展開動畫）
+                GeometryReader { geometry in
                 ScrollView {
                     LazyVStack(spacing: 0) {
                         ForEach(items) { item in
+                            let contentWidth = geometry.size.width - 24 // 扣除左右 padding
                             VStack(alignment: .leading, spacing: 4) {
                                 // 頂部：資訊 + 按鈕
                                 HStack(alignment: .top) {
@@ -200,12 +202,11 @@ struct PanelManagerView: View {
                                                 panel.close()
                                                 appDelegate.windowManager.remove(panel: panel)
                                             }
-                                            withAnimation {
-                                                items.removeAll { $0.id == item.id }
-                                                if expandedId == item.id {
-                                                    expandedId = nil
-                                                }
+                                            if expandedId == item.id {
+                                                expandedId = nil
                                             }
+                                            // 從 windowManager 重新讀取，確保 UI 與真實狀態一致
+                                            loadData()
                                         }
                                         .font(.system(size: 11))
 
@@ -224,10 +225,10 @@ struct PanelManagerView: View {
                                 }
 
                                 // NSTextView 展開區域（始終存在，高度控制展開/收合）
-                                let expandedHeight = TestNSTextViewWrapper.textHeight(
-                                    item.fullText, fontSize: fontSize, maxWidth: 460, maxHeight: 200
+                                let expandedHeight = ExpandedNSTextView.textHeight(
+                                    item.fullText, fontSize: fontSize, maxWidth: contentWidth, maxHeight: 200
                                 )
-                                TestNSTextViewWrapper(text: item.fullText, fontSize: fontSize)
+                                ExpandedNSTextView(text: item.fullText, fontSize: fontSize)
                                     .frame(height: expandedId == item.id ? expandedHeight : 0)
                                     .clipped()
                                     .background(expandedId == item.id ? Color(nsColor: .controlBackgroundColor) : .clear)
@@ -246,6 +247,7 @@ struct PanelManagerView: View {
                         }
                     }
                 }
+                } // GeometryReader
 
                 // 底部工具列
                 HStack {
@@ -254,7 +256,6 @@ struct PanelManagerView: View {
                     }
                     .alert("確定要關閉所有窗口嗎？", isPresented: $showCloseAllAlert) {
                         Button("關閉全部", role: .destructive) {
-                            // 關閉所有真實 panel 並清除 binding（不觸發焦點回跳）
                             if let appDelegate = NSApp.delegate as? AppDelegate {
                                 for item in items {
                                     if let binding = appDelegate.windowManager.allBindings.first(where: { $0.bindingKey == item.id }) {
@@ -265,10 +266,8 @@ struct PanelManagerView: View {
                                     }
                                 }
                             }
-                            withAnimation {
-                                items.removeAll()
-                                expandedId = nil
-                            }
+                            expandedId = nil
+                            loadData()
                         }
                         Button("取消", role: .cancel) {}
                     } message: {
@@ -281,7 +280,6 @@ struct PanelManagerView: View {
                     .disabled(!items.contains { $0.isOrphaned })
                     .alert("確定要關閉所有孤立窗口嗎？", isPresented: $showCloseOrphanedAlert) {
                         Button("關閉孤立", role: .destructive) {
-                            // 關閉所有孤立的真實 panel 並清除 binding（不觸發焦點回跳）
                             if let appDelegate = NSApp.delegate as? AppDelegate {
                                 for item in items where item.isOrphaned {
                                     if let binding = appDelegate.windowManager.allBindings.first(where: { $0.bindingKey == item.id }) {
@@ -292,12 +290,8 @@ struct PanelManagerView: View {
                                     }
                                 }
                             }
-                            withAnimation {
-                                items.removeAll { $0.isOrphaned }
-                                if let id = expandedId, !items.contains(where: { $0.id == id }) {
-                                    expandedId = nil
-                                }
-                            }
+                            expandedId = nil
+                            loadData()
                         }
                         Button("取消", role: .cancel) {}
                     } message: {
@@ -348,138 +342,9 @@ struct PanelManagerView: View {
         .frame(width: 500, height: 400)
 }
 
-// MARK: - NSTextView 測試（暫時）
+// MARK: - NSTextView 包裝
 
-struct TestNSTextViewContentView: View {
-    /// 模擬 panel 資料
-    struct TestItem: Identifiable {
-        let id: Int
-        let appName: String
-        let windowTitle: String
-        var fullText: String
-    }
-
-    @State private var items: [TestItem] = [
-        TestItem(id: 1, appName: "Terminal", windowTitle: "測試 1：單行 + 更高高度", fullText: "短文字測試"),
-        TestItem(id: 2, appName: "iTerm2", windowTitle: "測試 2：兩行文字", fullText: "第一行文字\n第二行文字"),
-        TestItem(id: 3, appName: "Terminal", windowTitle: "測試 3：貼上剪貼簿", fullText: "（點擊「貼上剪貼簿」替換此文字）"),
-    ]
-    @State private var expandedId: Int?
-    @State private var fontSize: CGFloat = SettingsManager.shared.fontSize
-
-    var body: some View {
-        VStack(spacing: 0) {
-            // 控制區
-            HStack {
-                Button("貼上剪貼簿到第 3 項") {
-                    guard let text = NSPasteboard.general.string(forType: .string) else { return }
-                    if let index = items.firstIndex(where: { $0.id == 3 }) {
-                        items[index].fullText = text
-                    }
-                }
-                Text("剪貼簿：\(NSPasteboard.general.string(forType: .string)?.count ?? 0) 字")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Text("字型：\(Int(fontSize))pt")
-                    .font(.system(size: 11))
-                Button("-") {
-                    let newSize = max(fontSize - 2, 12)
-                    fontSize = newSize
-                    SettingsManager.shared.fontSize = newSize
-                }
-                Button("+") {
-                    let newSize = min(fontSize + 2, 36)
-                    fontSize = newSize
-                    SettingsManager.shared.fontSize = newSize
-                }
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-
-            Divider()
-
-            // 列表（用 ScrollView + ForEach 取代 List，避免行高動畫跳躍）
-            ScrollView {
-                LazyVStack(spacing: 0) {
-                    ForEach(items) { item in
-                        VStack(alignment: .leading, spacing: 4) {
-                            // 頂部：資訊 + 按鈕
-                            HStack(alignment: .top) {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(item.appName)
-                                        .font(.system(size: 13, weight: .medium))
-                                        .lineLimit(1)
-
-                                    if !item.windowTitle.isEmpty {
-                                        Text(item.windowTitle)
-                                            .font(.system(size: 11))
-                                            .foregroundStyle(.secondary)
-                                            .lineLimit(1)
-                                    }
-
-                                    // 文字預覽（始終佔位，展開時隱藏文字但保留高度）
-                                    let preview = String(item.fullText.prefix(50)).replacingOccurrences(of: "\n", with: " ")
-                                    Text(item.fullText.count > 50 ? preview + "…" : preview)
-                                        .font(.system(size: 11))
-                                        .foregroundStyle(.tertiary)
-                                        .lineLimit(1)
-                                        .opacity(expandedId == item.id ? 0 : 1)
-                                }
-                                Spacer()
-                                HStack(spacing: 4) {
-                                    Button("關閉") {}
-                                        .font(.system(size: 11))
-                                    Button("複製") {}
-                                        .font(.system(size: 11))
-                                }
-                            }
-
-                            // NSTextView 始終存在，用高度控制展開/收合
-                            let expandedHeight = TestNSTextViewWrapper.textHeight(item.fullText, fontSize: fontSize, maxWidth: 460, maxHeight: 200)
-                            TestNSTextViewWrapper(text: item.fullText, fontSize: fontSize)
-                                .frame(height: expandedId == item.id ? expandedHeight : 0)
-                                .clipped()
-                                .background(expandedId == item.id ? Color(nsColor: .controlBackgroundColor) : .clear)
-                                .cornerRadius(expandedId == item.id ? 4 : 0)
-                        }
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                expandedId = expandedId == item.id ? nil : item.id
-                            }
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-
-                        Divider()
-                    }
-                }
-            }
-        }
-        .focusable()
-        .focusEffectDisabled()
-        .onKeyPress { keyPress in
-            guard keyPress.modifiers == .command else { return .ignored }
-            switch keyPress.characters {
-            case "=", "+":
-                let newSize = min(fontSize + 2, 36)
-                fontSize = newSize
-                SettingsManager.shared.fontSize = newSize
-                return .handled
-            case "-":
-                let newSize = max(fontSize - 2, 12)
-                fontSize = newSize
-                SettingsManager.shared.fontSize = newSize
-                return .handled
-            default:
-                return .ignored
-            }
-        }
-    }
-}
-
-struct TestNSTextViewWrapper: NSViewRepresentable {
+struct ExpandedNSTextView: NSViewRepresentable {
     let text: String
     let fontSize: CGFloat
 

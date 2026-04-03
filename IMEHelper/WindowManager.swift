@@ -207,32 +207,42 @@ class WindowManager {
     /// 取得所有綁定
     var allBindings: [WindowBinding] { bindings }
 
-    /// 移除 PID 已不存在的綁定（清理已關閉的 app）
-    @discardableResult
-    func cleanupTerminatedApps() -> [InputPanel] {
-        var cleanedPanels: [InputPanel] = []
-        bindings.removeAll { binding in
-            guard let app = NSRunningApplication(processIdentifier: binding.pid) else {
-                cleanedPanels.append(binding.panel)
-                return true
+    /// 清理 PID 已不存在的綁定（目標 app 已關閉）
+    /// 有文字的 panel 標記為孤立（保留 binding），空文字的直接移除
+    func cleanupTerminatedApps() {
+        for binding in bindings where !binding.panel.isOrphaned {
+            let appGone: Bool
+            if let app = NSRunningApplication(processIdentifier: binding.pid) {
+                appGone = app.isTerminated
+            } else {
+                appGone = true
             }
-            if app.isTerminated {
-                cleanedPanels.append(binding.panel)
-                return true
+
+            guard appGone else { continue }
+
+            let hasText = !binding.panel.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            if hasText {
+                binding.panel.markAsOrphaned()
+                NSApp.activate(ignoringOtherApps: true)
+                binding.panel.makeKeyAndOrderFront(nil)
+                binding.panel.focusTextView()
+            } else {
+                binding.panel.isClosingProgrammatically = true
+                binding.panel.close()
             }
-            return false
         }
-        return cleanedPanels
+        // 移除空文字已關閉的 binding
+        bindings.removeAll { $0.panel.isClosingProgrammatically && !$0.panel.isVisible }
     }
 
     /// 檢查所有綁定的視窗是否還存在（透過 CGWindowID 驗證）
-    @discardableResult
-    func cleanupClosedWindows() -> [InputPanel] {
+    /// 有文字的 panel 標記為孤立（保留 binding），空文字的直接移除
+    func cleanupClosedWindows() {
         // 沒有任何 binding 時不需要掃描
-        guard !bindings.isEmpty else { return [] }
+        guard !bindings.isEmpty else { return }
 
         guard let windowInfoList = CGWindowListCopyWindowInfo([.optionAll], kCGNullWindowID) as? [[String: Any]] else {
-            return []
+            return
         }
 
         var activeWindowIDs = Set<CGWindowID>()
@@ -242,16 +252,22 @@ class WindowManager {
             }
         }
 
-        var cleanedPanels: [InputPanel] = []
-        bindings.removeAll { binding in
-            guard binding.windowID != 0 else { return false }
+        for binding in bindings where !binding.panel.isOrphaned {
+            guard binding.windowID != 0 else { continue }
+            guard !activeWindowIDs.contains(binding.windowID) else { continue }
 
-            if !activeWindowIDs.contains(binding.windowID) {
-                cleanedPanels.append(binding.panel)
-                return true
+            let hasText = !binding.panel.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            if hasText {
+                binding.panel.markAsOrphaned()
+                NSApp.activate(ignoringOtherApps: true)
+                binding.panel.makeKeyAndOrderFront(nil)
+                binding.panel.focusTextView()
+            } else {
+                binding.panel.isClosingProgrammatically = true
+                binding.panel.close()
             }
-            return false
         }
-        return cleanedPanels
+        // 移除空文字已關閉的 binding
+        bindings.removeAll { $0.panel.isClosingProgrammatically && !$0.panel.isVisible }
     }
 }
