@@ -17,16 +17,19 @@ class PanelManagerWindowController: NSWindowController {
 
     /// 開啟或顯示管理視窗（單例）
     static func show() {
-        if let existing = shared {
-            existing.window?.makeKeyAndOrderFront(nil)
-            NSApp.activate(ignoringOtherApps: true)
-            return
-        }
+        // 延遲一個短時間，讓 NSStatusItem menu dismiss 完成，避免 activation 時序競爭
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            if let existing = shared {
+                NSApp.activate(ignoringOtherApps: true)
+                existing.window?.makeKeyAndOrderFront(nil)
+                return
+            }
 
-        let controller = PanelManagerWindowController()
-        shared = controller
-        controller.window?.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+            let controller = PanelManagerWindowController()
+            shared = controller
+            NSApp.activate(ignoringOtherApps: true)
+            controller.window?.makeKeyAndOrderFront(nil)
+        }
     }
 
     // MARK: - 初始化

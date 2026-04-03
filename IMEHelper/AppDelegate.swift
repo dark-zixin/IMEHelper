@@ -392,9 +392,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
            !existingPanel.isManuallyHidden {
             existingPanel.setSourceApp(sourceApp)
             existingPanel.hiddenSince = nil
-            NSApp.activate(ignoringOtherApps: true)
-            existingPanel.makeKeyAndOrderFront(nil)
-            existingPanel.focusTextView()
+            existingPanel.orderFrontRegardless()  // 只顯示不搶焦點，用戶點擊時才接收鍵盤
         }
     }
 

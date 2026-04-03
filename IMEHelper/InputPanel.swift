@@ -83,6 +83,7 @@ class InputPanel: NSPanel {
         // 設定窗口屬性
         self.level = .floating
         self.isFloatingPanel = true
+        self.hidesOnDeactivate = false  // 不隨 app 失焦自動隱藏，可見性由程式碼控制
         self.becomesKeyOnlyIfNeeded = false  // 需要接收鍵盤輸入
         self.isMovableByWindowBackground = true
         self.titlebarAppearsTransparent = false  // 保留標題列
