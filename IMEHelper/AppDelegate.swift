@@ -437,8 +437,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
         // 設定回填旗標，抑制自動恢復
         isInjecting = true
 
-        // 標記為孤立狀態，避免回填過程中被 hideAll/tryRestore 干擾
-        panel.isOrphaned = true
+        // 標記為回填中，避免被 hideAll/tryRestore 干擾
+        panel.isInjecting = true
 
         // 隱藏視窗（但保留文字，等回填成功後才清空）
         panel.orderOut(nil)
@@ -452,12 +452,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
             if success {
                 // 回填成功，清空文字、移除綁定、關閉 panel
                 panel.text = ""
-                panel.isOrphaned = false
+                panel.isInjecting = false
                 self.windowManager.remove(panel: panel)
                 panel.hidePanel()
                 NSLog("AppDelegate: 文字回填完成")
             } else {
                 // 回填失敗，標記為孤立並重新顯示（binding 保留，管理視窗可看到）
+                panel.isInjecting = false
                 panel.markAsOrphaned()
                 NSApp.activate(ignoringOtherApps: true)
                 panel.makeKeyAndOrderFront(nil)

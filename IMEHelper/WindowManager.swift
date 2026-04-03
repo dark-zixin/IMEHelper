@@ -19,7 +19,7 @@ class WindowManager {
     /// 精確匹配失敗且有 loginLine 時，用 pid + loginLine 匹配（忽略 windowID 差異）
     func find(for sourceApp: SourceAppInfo) -> InputPanel? {
         // 精確匹配
-        if let exact = bindings.first(where: { $0.bindingKey == sourceApp.bindingKey && !$0.panel.isOrphaned }) {
+        if let exact = bindings.first(where: { $0.bindingKey == sourceApp.bindingKey && !$0.panel.isOrphaned && !$0.panel.isInjecting }) {
             return exact.panel
         }
 
@@ -27,7 +27,7 @@ class WindowManager {
         if !sourceApp.loginLine.isEmpty {
             let loginKey = "|login:\(sourceApp.loginLine)"
             if let match = bindings.first(where: {
-                $0.pid == sourceApp.pid && $0.bindingKey.contains(loginKey) && !$0.panel.isOrphaned
+                $0.pid == sourceApp.pid && $0.bindingKey.contains(loginKey) && !$0.panel.isOrphaned && !$0.panel.isInjecting
             }) {
                 return match.panel
             }
@@ -184,7 +184,7 @@ class WindowManager {
     func hideAll() {
         var toClose: [InputPanel] = []
         for binding in bindings {
-            guard binding.panel.isVisible, !binding.panel.isOrphaned else { continue }
+            guard binding.panel.isVisible, !binding.panel.isOrphaned, !binding.panel.isInjecting else { continue }
 
             let hasText = !binding.panel.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             if hasText {

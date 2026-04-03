@@ -56,6 +56,9 @@ class InputPanel: NSPanel {
     /// 是否為孤立狀態（目標視窗已關閉，不受 hideAll 影響）
     var isOrphaned = false
 
+    /// 是否正在回填中（不受 hideAll/tryRestore 影響）
+    var isInjecting = false
+
     /// 隱藏開始的時間（用於淘汰分數計算）
     var hiddenSince: Date?
 

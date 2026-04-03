@@ -120,7 +120,7 @@ struct PanelManagerView: View {
         guard let windowManager = (NSApp.delegate as? AppDelegate)?.windowManager else { return }
 
         let newItems = windowManager.allBindings
-            .filter { !$0.panel.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            .filter { !$0.panel.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !$0.panel.isInjecting }
             .map { binding -> PanelItem in
                 let panel = binding.panel
                 return PanelItem(
