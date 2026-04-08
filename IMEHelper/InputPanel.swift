@@ -28,6 +28,13 @@ class InputPanel: NSPanel {
     /// 玻璃效果背景
     private var visualEffectView: NSVisualEffectView!
 
+    /// 失焦時透明度乘數
+    private let unfocusedAlphaMultiplier: CGFloat = 0.8
+
+    /// 焦點色帶 view
+    private var focusStripView: NSView?
+    private var focusGradientLayer: CAGradientLayer?
+
     /// 底部提示標籤
     private var hintLabel: NSTextField!
 
@@ -98,6 +105,7 @@ class InputPanel: NSPanel {
         setupVisualEffect()
         setupTextView()
         setupHintLabel()
+        setupFocusStrip()
 
         // 監聽窗口移動，記錄位置
         NotificationCenter.default.addObserver(
@@ -112,6 +120,22 @@ class InputPanel: NSPanel {
             self,
             selector: #selector(windowAlphaDidChange(_:)),
             name: SettingsManager.windowAlphaDidChangeNotification,
+            object: nil
+        )
+
+        // 監聽設定視窗開啟/關閉，重新計算失焦透明度
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(settingsVisibilityDidChange(_:)),
+            name: SettingsWindowController.visibilityDidChangeNotification,
+            object: nil
+        )
+
+        // 監聽焦點色帶顏色變更
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(focusStripColorDidChange(_:)),
+            name: SettingsManager.focusStripColorDidChangeNotification,
             object: nil
         )
 
@@ -425,6 +449,29 @@ class InputPanel: NSPanel {
     /// 透明度變更通知處理 — 即時更新窗口透明度
     @objc private func windowAlphaDidChange(_ notification: Notification) {
         visualEffectView.alphaValue = SettingsManager.shared.windowAlpha
+        // 同步更新 window 的透明度（考慮焦點狀態）
+        updateAlphaForFocusState()
+    }
+
+    /// 設定視窗開啟/關閉通知 — 重新計算失焦透明度
+    @objc private func settingsVisibilityDidChange(_ notification: Notification) {
+        updateAlphaForFocusState()
+    }
+
+    /// 根據焦點狀態和設定視窗狀態更新透明度
+    private func updateAlphaForFocusState() {
+        if isKeyWindow {
+            self.alphaValue = SettingsManager.shared.windowAlpha
+        } else {
+            let multiplier: CGFloat = SettingsWindowController.shared != nil ? 1.0 : unfocusedAlphaMultiplier
+            self.alphaValue = SettingsManager.shared.windowAlpha * multiplier
+        }
+    }
+
+    /// 焦點色帶顏色變更通知 — 即時更新漸變顏色
+    @objc private func focusStripColorDidChange(_ notification: Notification) {
+        let color = SettingsManager.shared.focusStripColor
+        focusGradientLayer?.colors = [color.cgColor, color.withAlphaComponent(0).cgColor]
     }
 
     /// 字型大小變更通知處理 — 即時更新文字大小
@@ -511,6 +558,63 @@ class InputPanel: NSPanel {
     /// 讓 panel 可以成為 main window
     override var canBecomeMain: Bool {
         return true
+    }
+
+    // MARK: - 焦點色帶提示
+
+    /// 在視窗最上方建立色帶 view（4px 高，上→下漸變）
+    private func setupFocusStrip() {
+        guard let themeFrame = contentView?.superview else { return }
+        let strip = NSView()
+        strip.wantsLayer = true
+        strip.isHidden = true
+        strip.translatesAutoresizingMaskIntoConstraints = false
+        themeFrame.addSubview(strip)
+
+        NSLayoutConstraint.activate([
+            strip.topAnchor.constraint(equalTo: themeFrame.topAnchor),
+            strip.leadingAnchor.constraint(equalTo: themeFrame.leadingAnchor),
+            strip.trailingAnchor.constraint(equalTo: themeFrame.trailingAnchor),
+            strip.heightAnchor.constraint(equalToConstant: 4),
+        ])
+
+        // 建立漸變 layer（上實色→下透明）
+        let gradient = CAGradientLayer()
+        let color = SettingsManager.shared.focusStripColor
+        gradient.colors = [color.cgColor, color.withAlphaComponent(0).cgColor]
+        gradient.startPoint = CGPoint(x: 0.5, y: 1)  // 上
+        gradient.endPoint = CGPoint(x: 0.5, y: 0)    // 下
+        gradient.frame = CGRect(x: 0, y: 0, width: 2000, height: 4)
+        strip.layer?.addSublayer(gradient)
+        focusGradientLayer = gradient
+
+        focusStripView = strip
+
+        // 監聽 layout 變化更新 gradient frame
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(updateGradientFrame),
+            name: NSView.frameDidChangeNotification,
+            object: strip
+        )
+        strip.postsFrameChangedNotifications = true
+    }
+
+    @objc private func updateGradientFrame() {
+        guard let strip = focusStripView else { return }
+        focusGradientLayer?.frame = strip.bounds
+    }
+
+    override func becomeKey() {
+        super.becomeKey()
+        focusStripView?.isHidden = false
+        updateAlphaForFocusState()
+    }
+
+    override func resignKey() {
+        super.resignKey()
+        focusStripView?.isHidden = true
+        updateAlphaForFocusState()
     }
 }
 

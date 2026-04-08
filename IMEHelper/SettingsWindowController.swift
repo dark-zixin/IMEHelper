@@ -13,7 +13,11 @@ import ServiceManagement
 class SettingsWindowController: NSWindowController {
 
     /// 單例實例，確保只有一個設定視窗
-    private static var shared: SettingsWindowController?
+    /// 單例實例（internal 供 InputPanel 判斷設定視窗是否開啟）
+    static private(set) var shared: SettingsWindowController?
+
+    /// 設定視窗開啟/關閉通知（讓 InputPanel 重新計算失焦透明度）
+    static let visibilityDidChangeNotification = Notification.Name("SettingsWindowVisibilityDidChange")
 
     /// 窗口位置下拉選單
     private var positionPopUpButton: NSPopUpButton!
@@ -35,6 +39,9 @@ class SettingsWindowController: NSWindowController {
 
     /// 窗口上限數值標籤
     private var maxPanelValueLabel: NSTextField!
+
+    /// 焦點色帶顏色選擇器
+    private var focusStripColorWell: NSColorWell!
 
     /// 快捷鍵錄製控制項
     private var hotkeyRecorderView: HotkeyRecorderView!
@@ -59,6 +66,7 @@ class SettingsWindowController: NSWindowController {
             shared = controller
             NSApp.activate(ignoringOtherApps: true)
             controller.window?.makeKeyAndOrderFront(nil)
+            NotificationCenter.default.post(name: visibilityDidChangeNotification, object: nil)
         }
     }
 
@@ -66,7 +74,7 @@ class SettingsWindowController: NSWindowController {
 
     convenience init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 350, height: 420),
+            contentRect: NSRect(x: 0, y: 0, width: 350, height: 485),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -95,34 +103,34 @@ class SettingsWindowController: NSWindowController {
 
         // 快捷鍵區域
         let hotkeyLabel = createLabel(text: "快捷鍵：", frame: NSRect(
-            x: padding, y: 360, width: labelWidth, height: 22
+            x: padding, y: 425, width: labelWidth, height: 22
         ))
         contentView.addSubview(hotkeyLabel)
 
         hotkeyRecorderView = HotkeyRecorderView(frame: NSRect(
-            x: controlX, y: 358, width: 120, height: 26
+            x: controlX, y: 423, width: 120, height: 26
         ))
         hotkeyRecorderView.delegate = self
         contentView.addSubview(hotkeyRecorderView)
 
         let resetButton = NSButton(title: "重設", target: self, action: #selector(resetHotkey(_:)))
-        resetButton.frame = NSRect(x: controlX + 128, y: 358, width: 60, height: 26)
+        resetButton.frame = NSRect(x: controlX + 128, y: 423, width: 60, height: 26)
         resetButton.bezelStyle = .rounded
         resetButton.font = NSFont.systemFont(ofSize: 12)
         contentView.addSubview(resetButton)
 
         // 分隔線
-        let separator0 = createSeparator(y: 345, width: 310, padding: padding)
+        let separator0 = createSeparator(y: 410, width: 310, padding: padding)
         contentView.addSubview(separator0)
 
         // 窗口位置區域
         let positionLabel = createLabel(text: "窗口位置：", frame: NSRect(
-            x: padding, y: 312, width: labelWidth, height: 22
+            x: padding, y: 377, width: labelWidth, height: 22
         ))
         contentView.addSubview(positionLabel)
 
         positionPopUpButton = NSPopUpButton(frame: NSRect(
-            x: controlX, y: 310, width: 190, height: 26
+            x: controlX, y: 375, width: 190, height: 26
         ), pullsDown: false)
         positionPopUpButton.addItems(withTitles: [
             "跟著文字游標",
@@ -134,17 +142,17 @@ class SettingsWindowController: NSWindowController {
         contentView.addSubview(positionPopUpButton)
 
         // 分隔線
-        let separator1 = createSeparator(y: 297, width: 310, padding: padding)
+        let separator1 = createSeparator(y: 362, width: 310, padding: padding)
         contentView.addSubview(separator1)
 
         // 字型大小區域
         let fontSizeLabel = createLabel(text: "文字大小：", frame: NSRect(
-            x: padding, y: 264, width: labelWidth, height: 22
+            x: padding, y: 329, width: labelWidth, height: 22
         ))
         contentView.addSubview(fontSizeLabel)
 
         fontSizeSlider = NSSlider(frame: NSRect(
-            x: controlX, y: 264, width: 150, height: 22
+            x: controlX, y: 329, width: 150, height: 22
         ))
         fontSizeSlider.minValue = 12
         fontSizeSlider.maxValue = 36
@@ -155,23 +163,23 @@ class SettingsWindowController: NSWindowController {
 
         fontSizeValueLabel = NSTextField(labelWithString: "14")
         fontSizeValueLabel.frame = NSRect(
-            x: controlX + 155, y: 264, width: 40, height: 22
+            x: controlX + 155, y: 329, width: 40, height: 22
         )
         fontSizeValueLabel.alignment = .right
         contentView.addSubview(fontSizeValueLabel)
 
         // 分隔線
-        let separator2 = createSeparator(y: 250, width: 310, padding: padding)
+        let separator2 = createSeparator(y: 315, width: 310, padding: padding)
         contentView.addSubview(separator2)
 
         // 透明度區域
         let alphaLabel = createLabel(text: "窗口透明度：", frame: NSRect(
-            x: padding, y: 217, width: labelWidth, height: 22
+            x: padding, y: 282, width: labelWidth, height: 22
         ))
         contentView.addSubview(alphaLabel)
 
         alphaSlider = NSSlider(frame: NSRect(
-            x: controlX, y: 217, width: 150, height: 22
+            x: controlX, y: 282, width: 150, height: 22
         ))
         alphaSlider.minValue = 0.5
         alphaSlider.maxValue = 1.0
@@ -182,23 +190,42 @@ class SettingsWindowController: NSWindowController {
 
         alphaValueLabel = NSTextField(labelWithString: "80%")
         alphaValueLabel.frame = NSRect(
-            x: controlX + 155, y: 217, width: 40, height: 22
+            x: controlX + 155, y: 282, width: 40, height: 22
         )
         alphaValueLabel.alignment = .right
         contentView.addSubview(alphaValueLabel)
 
         // 分隔線
-        let separator3 = createSeparator(y: 203, width: 310, padding: padding)
+        let separator3 = createSeparator(y: 268, width: 310, padding: padding)
         contentView.addSubview(separator3)
+
+        // 焦點色帶顏色（標籤在上，expanded 色盤在下）
+        let focusStripLabel = createLabel(text: "焦點色帶：", frame: NSRect(
+            x: padding, y: 235, width: labelWidth, height: 22
+        ))
+        contentView.addSubview(focusStripLabel)
+
+        focusStripColorWell = NSColorWell(frame: NSRect(
+            x: controlX, y: 225, width: 190, height: 38
+        ))
+        focusStripColorWell.colorWellStyle = .expanded
+        focusStripColorWell.color = SettingsManager.shared.focusStripColor
+        focusStripColorWell.target = self
+        focusStripColorWell.action = #selector(focusStripColorChanged(_:))
+        contentView.addSubview(focusStripColorWell)
+
+        // 分隔線
+        let separator3b = createSeparator(y: 213, width: 310, padding: padding)
+        contentView.addSubview(separator3b)
 
         // 窗口上限區域
         let maxPanelLabel = createLabel(text: "窗口上限：", frame: NSRect(
-            x: padding, y: 170, width: labelWidth, height: 22
+            x: padding, y: 180, width: labelWidth, height: 22
         ))
         contentView.addSubview(maxPanelLabel)
 
         maxPanelSlider = NSSlider(frame: NSRect(
-            x: controlX, y: 170, width: 150, height: 22
+            x: controlX, y: 180, width: 150, height: 22
         ))
         maxPanelSlider.minValue = 5
         maxPanelSlider.maxValue = 50
@@ -210,19 +237,19 @@ class SettingsWindowController: NSWindowController {
 
         maxPanelValueLabel = NSTextField(labelWithString: "20")
         maxPanelValueLabel.frame = NSRect(
-            x: controlX + 155, y: 170, width: 40, height: 22
+            x: controlX + 155, y: 180, width: 40, height: 22
         )
         maxPanelValueLabel.alignment = .right
         contentView.addSubview(maxPanelValueLabel)
 
         // 分隔線
-        let separator4 = createSeparator(y: 156, width: 310, padding: padding)
+        let separator4 = createSeparator(y: 166, width: 310, padding: padding)
         contentView.addSubview(separator4)
 
         // 開機啟動
         launchAtLoginCheckbox = NSButton(checkboxWithTitle: "開機時自動啟動", target: self, action: #selector(launchAtLoginChanged(_:)))
         launchAtLoginCheckbox.frame = NSRect(
-            x: padding, y: 123, width: 200, height: 22
+            x: padding, y: 133, width: 200, height: 22
         )
         contentView.addSubview(launchAtLoginCheckbox)
 
@@ -312,6 +339,10 @@ class SettingsWindowController: NSWindowController {
         updateAlphaLabel()
     }
 
+    @objc private func focusStripColorChanged(_ sender: NSColorWell) {
+        SettingsManager.shared.focusStripColor = sender.color
+    }
+
     @objc private func launchAtLoginChanged(_ sender: NSButton) {
         let service = SMAppService.mainApp
 
@@ -354,6 +385,7 @@ extension SettingsWindowController: NSWindowDelegate {
         hotkeyRecorderDidCancelRecording(hotkeyRecorderView)
         // 清除單例引用，下次開啟時重新建立
         SettingsWindowController.shared = nil
+        NotificationCenter.default.post(name: SettingsWindowController.visibilityDidChangeNotification, object: nil)
     }
 }
 

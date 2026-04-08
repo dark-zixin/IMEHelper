@@ -32,6 +32,7 @@ class SettingsManager {
         static let maxPanelCount = "maxPanelCount"
         static let hotkeyKeyCode = "hotkeyKeyCode"
         static let hotkeyModifierFlags = "hotkeyModifierFlags"
+        static let focusStripColor = "focusStripColor"
     }
 
     // MARK: - 設定變更通知
@@ -44,6 +45,9 @@ class SettingsManager {
 
     /// 快捷鍵變更通知
     static let hotkeyDidChangeNotification = Notification.Name("SettingsManager.hotkeyDidChange")
+
+    /// 焦點色帶顏色變更通知
+    static let focusStripColorDidChangeNotification = Notification.Name("SettingsManager.focusStripColorDidChange")
 
     /// 取得/設定窗口位置模式
     var windowPositionMode: WindowPositionMode {
@@ -99,6 +103,25 @@ class SettingsManager {
             defaults.set(clamped, forKey: Keys.windowAlpha)
             // 發送通知，讓已開啟的窗口即時更新
             NotificationCenter.default.post(name: Self.windowAlphaDidChangeNotification, object: nil)
+        }
+    }
+
+    // MARK: - 焦點色帶顏色
+
+    /// 取得/設定焦點色帶顏色（預設使用系統強調色）
+    var focusStripColor: NSColor {
+        get {
+            guard let data = defaults.data(forKey: Keys.focusStripColor),
+                  let color = try? NSKeyedUnarchiver.unarchivedObject(ofClass: NSColor.self, from: data) else {
+                return NSColor.controlAccentColor
+            }
+            return color
+        }
+        set {
+            if let data = try? NSKeyedArchiver.archivedData(withRootObject: newValue, requiringSecureCoding: true) {
+                defaults.set(data, forKey: Keys.focusStripColor)
+            }
+            NotificationCenter.default.post(name: Self.focusStripColorDidChangeNotification, object: nil)
         }
     }
 
