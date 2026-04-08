@@ -79,7 +79,7 @@ class SettingsWindowController: NSWindowController {
             backing: .buffered,
             defer: false
         )
-        window.title = "IMEHelper 設定"
+        window.title = NSLocalizedString("settings.title", comment: "")
         window.center()
         window.isReleasedWhenClosed = false
 
@@ -102,7 +102,7 @@ class SettingsWindowController: NSWindowController {
         let controlX: CGFloat = padding + labelWidth + 8
 
         // 快捷鍵區域
-        let hotkeyLabel = createLabel(text: "快捷鍵：", frame: NSRect(
+        let hotkeyLabel = createLabel(text: NSLocalizedString("settings.hotkey", comment: ""), frame: NSRect(
             x: padding, y: 425, width: labelWidth, height: 22
         ))
         contentView.addSubview(hotkeyLabel)
@@ -113,7 +113,7 @@ class SettingsWindowController: NSWindowController {
         hotkeyRecorderView.delegate = self
         contentView.addSubview(hotkeyRecorderView)
 
-        let resetButton = NSButton(title: "重設", target: self, action: #selector(resetHotkey(_:)))
+        let resetButton = NSButton(title: NSLocalizedString("settings.hotkey_reset", comment: ""), target: self, action: #selector(resetHotkey(_:)))
         resetButton.frame = NSRect(x: controlX + 128, y: 423, width: 60, height: 26)
         resetButton.bezelStyle = .rounded
         resetButton.font = NSFont.systemFont(ofSize: 12)
@@ -124,7 +124,7 @@ class SettingsWindowController: NSWindowController {
         contentView.addSubview(separator0)
 
         // 窗口位置區域
-        let positionLabel = createLabel(text: "窗口位置：", frame: NSRect(
+        let positionLabel = createLabel(text: NSLocalizedString("settings.position", comment: ""), frame: NSRect(
             x: padding, y: 377, width: labelWidth, height: 22
         ))
         contentView.addSubview(positionLabel)
@@ -133,9 +133,9 @@ class SettingsWindowController: NSWindowController {
             x: controlX, y: 375, width: 190, height: 26
         ), pullsDown: false)
         positionPopUpButton.addItems(withTitles: [
-            "跟著文字游標",
-            "螢幕中央",
-            "記住上次位置"
+            NSLocalizedString("settings.position_caret", comment: ""),
+            NSLocalizedString("settings.position_center", comment: ""),
+            NSLocalizedString("settings.position_remember", comment: ""),
         ])
         positionPopUpButton.target = self
         positionPopUpButton.action = #selector(positionModeChanged(_:))
@@ -146,7 +146,7 @@ class SettingsWindowController: NSWindowController {
         contentView.addSubview(separator1)
 
         // 字型大小區域
-        let fontSizeLabel = createLabel(text: "文字大小：", frame: NSRect(
+        let fontSizeLabel = createLabel(text: NSLocalizedString("settings.font_size", comment: ""), frame: NSRect(
             x: padding, y: 329, width: labelWidth, height: 22
         ))
         contentView.addSubview(fontSizeLabel)
@@ -173,7 +173,7 @@ class SettingsWindowController: NSWindowController {
         contentView.addSubview(separator2)
 
         // 透明度區域
-        let alphaLabel = createLabel(text: "窗口透明度：", frame: NSRect(
+        let alphaLabel = createLabel(text: NSLocalizedString("settings.alpha", comment: ""), frame: NSRect(
             x: padding, y: 282, width: labelWidth, height: 22
         ))
         contentView.addSubview(alphaLabel)
@@ -200,7 +200,7 @@ class SettingsWindowController: NSWindowController {
         contentView.addSubview(separator3)
 
         // 焦點色帶顏色（標籤在上，expanded 色盤在下）
-        let focusStripLabel = createLabel(text: "焦點色帶：", frame: NSRect(
+        let focusStripLabel = createLabel(text: NSLocalizedString("settings.focus_strip", comment: ""), frame: NSRect(
             x: padding, y: 235, width: labelWidth, height: 22
         ))
         contentView.addSubview(focusStripLabel)
@@ -219,7 +219,7 @@ class SettingsWindowController: NSWindowController {
         contentView.addSubview(separator3b)
 
         // 窗口上限區域
-        let maxPanelLabel = createLabel(text: "窗口上限：", frame: NSRect(
+        let maxPanelLabel = createLabel(text: NSLocalizedString("settings.max_panels", comment: ""), frame: NSRect(
             x: padding, y: 180, width: labelWidth, height: 22
         ))
         contentView.addSubview(maxPanelLabel)
@@ -247,14 +247,14 @@ class SettingsWindowController: NSWindowController {
         contentView.addSubview(separator4)
 
         // 開機啟動
-        launchAtLoginCheckbox = NSButton(checkboxWithTitle: "開機時自動啟動", target: self, action: #selector(launchAtLoginChanged(_:)))
+        launchAtLoginCheckbox = NSButton(checkboxWithTitle: NSLocalizedString("settings.launch_at_login", comment: ""), target: self, action: #selector(launchAtLoginChanged(_:)))
         launchAtLoginCheckbox.frame = NSRect(
             x: padding, y: 133, width: 200, height: 22
         )
         contentView.addSubview(launchAtLoginCheckbox)
 
         // 底部提示
-        let noteLabel = NSTextField(labelWithString: "設定變更會立即生效")
+        let noteLabel = NSTextField(labelWithString: NSLocalizedString("settings.note", comment: ""))
         noteLabel.frame = NSRect(
             x: padding, y: 20, width: 310, height: 16
         )

@@ -88,12 +88,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
         let menu = NSMenu()
 
         // 設定選項
-        let settingsItem = NSMenuItem(title: "設定...", action: #selector(openSettings(_:)), keyEquivalent: "")
+        let settingsItem = NSMenuItem(title: NSLocalizedString("menu.settings", comment: ""), action: #selector(openSettings(_:)), keyEquivalent: "")
         settingsItem.target = self
         menu.addItem(settingsItem)
 
         // 窗口管理
-        let panelManagerItem = NSMenuItem(title: "窗口管理...", action: #selector(openPanelManager(_:)), keyEquivalent: "")
+        let panelManagerItem = NSMenuItem(title: NSLocalizedString("menu.panel_manager", comment: ""), action: #selector(openPanelManager(_:)), keyEquivalent: "")
         panelManagerItem.target = self
         menu.addItem(panelManagerItem)
 
@@ -103,7 +103,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
 
         // 結束應用程式
         let quitItem = NSMenuItem(
-            title: "結束 IMEHelper",
+            title: NSLocalizedString("menu.quit", comment: ""),
             action: #selector(NSApplication.terminate(_:)),
             keyEquivalent: "q"
         )
@@ -421,11 +421,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
             let currentDesc = currentSourceApp.tabDescription.isEmpty ? currentSourceApp.windowTitle : currentSourceApp.tabDescription
             let sourceDesc = sourceInfo.tabDescription.isEmpty ? sourceInfo.windowTitle : sourceInfo.tabDescription
             let alert = NSAlert()
-            alert.messageText = "目標視窗可能已變更"
-            alert.informativeText = "原始目標「\(sourceDesc)」已不是目前的前景視窗。\n目前為「\(currentDesc)」。\n\n是否仍要送出文字？"
+            alert.messageText = NSLocalizedString("alert.target_changed_title", comment: "")
+            alert.informativeText = String(format: NSLocalizedString("alert.target_changed_message", comment: ""), sourceDesc, currentDesc)
             alert.alertStyle = .warning
-            alert.addButton(withTitle: "送出")
-            alert.addButton(withTitle: "取消")
+            alert.addButton(withTitle: NSLocalizedString("alert.target_changed_send", comment: ""))
+            alert.addButton(withTitle: NSLocalizedString("alert.target_changed_cancel", comment: ""))
             let response = alert.runModal()
             if response != .alertFirstButtonReturn {
                 return
@@ -491,11 +491,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
         }
 
         let alert = NSAlert()
-        alert.messageText = "需要輔助使用權限"
-        alert.informativeText = "IMEHelper 需要「輔助使用」權限才能偵測輸入法切換和游標位置。\n\n請前往「系統設定 → 隱私權與安全性 → 輔助使用」，將 IMEHelper 加入允許清單。"
+        alert.messageText = NSLocalizedString("alert.accessibility_title", comment: "")
+        alert.informativeText = NSLocalizedString("alert.accessibility_message", comment: "")
         alert.alertStyle = .warning
-        alert.addButton(withTitle: "開啟系統設定")
-        alert.addButton(withTitle: "稍後再說")
+        alert.addButton(withTitle: NSLocalizedString("alert.accessibility_open_settings", comment: ""))
+        alert.addButton(withTitle: NSLocalizedString("alert.accessibility_later", comment: ""))
 
         let response = alert.runModal()
         if response == .alertFirstButtonReturn {

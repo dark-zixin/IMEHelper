@@ -94,7 +94,7 @@ class InputPanel: NSPanel {
         self.becomesKeyOnlyIfNeeded = false  // 需要接收鍵盤輸入
         self.isMovableByWindowBackground = true
         self.titlebarAppearsTransparent = false  // 保留標題列
-        self.title = "IMEHelper 輸入面板"
+        self.title = NSLocalizedString("panel.default_title", comment: "")
 
         // 設定最小尺寸
         self.minSize = NSSize(width: 300, height: 60)
@@ -264,7 +264,7 @@ class InputPanel: NSPanel {
         isOrphaned = true
         sourceAppInfo = nil  // 清掉來源，關閉時不切焦點
         self.hidesOnDeactivate = false  // 不隨 app 失焦自動隱藏
-        self.title = "⚠ 目標視窗已關閉 — 請手動複製文字後關閉"
+        self.title = NSLocalizedString("panel.title_orphaned", comment: "")
     }
 
     /// 標記為淘汰候選，更新標題列提示讓使用者決定
@@ -272,7 +272,7 @@ class InputPanel: NSPanel {
         isOrphaned = true  // 不受 hideAll 影響
         sourceAppInfo = nil  // 清掉來源，關閉時不切焦點
         self.hidesOnDeactivate = false  // 不隨 app 失焦自動隱藏
-        self.title = "⚠ 窗口數量已達上限 — 請複製文字後關閉以釋放空間"
+        self.title = NSLocalizedString("panel.title_eviction", comment: "")
     }
 
     /// 設定來源 app 資訊（更新標題列顯示）
@@ -282,9 +282,9 @@ class InputPanel: NSPanel {
         lastWindowTitle = info.windowTitle
 
         if info.windowTitle.isEmpty {
-            self.title = "輸入到：\(info.appName)"
+            self.title = String(format: NSLocalizedString("panel.title_app", comment: ""), info.appName)
         } else {
-            self.title = "輸入到：\(info.appName) - \(info.windowTitle)"
+            self.title = String(format: NSLocalizedString("panel.title_app_window", comment: ""), info.appName, info.windowTitle)
         }
     }
 
@@ -660,7 +660,7 @@ extension InputPanel: InputTextViewDelegate {
 
         case .clearText:
             textView.string = ""
-            showHintLabel(message: "文字已清空，再按一次 ESC 關閉視窗")
+            showHintLabel(message: NSLocalizedString("panel.hint_text_cleared", comment: ""))
 
         case .closePanel:
             hidePanel()
@@ -691,11 +691,11 @@ extension InputPanel: NSWindowDelegate {
 
         // 有文字時跳出確認對話框
         let alert = NSAlert()
-        alert.messageText = "確定要關閉嗎？"
-        alert.informativeText = "輸入區還有未送出的文字，關閉後將會遺失。"
+        alert.messageText = NSLocalizedString("panel.alert_close_title", comment: "")
+        alert.informativeText = NSLocalizedString("panel.alert_close_message", comment: "")
         alert.alertStyle = .warning
-        alert.addButton(withTitle: "關閉")
-        alert.addButton(withTitle: "取消")
+        alert.addButton(withTitle: NSLocalizedString("panel.alert_close_confirm", comment: ""))
+        alert.addButton(withTitle: NSLocalizedString("panel.alert_close_cancel", comment: ""))
 
         let response = alert.runModal()
         if response == .alertFirstButtonReturn {

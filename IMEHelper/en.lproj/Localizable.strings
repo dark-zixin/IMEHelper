@@ -1,0 +1,74 @@
+/* Menu Bar */
+"menu.settings" = "Settings...";
+"menu.panel_manager" = "Panel Manager...";
+"menu.quit" = "Quit IMEHelper";
+
+/* InputPanel - Window Title */
+"panel.default_title" = "IMEHelper Input Panel";
+"panel.title_app" = "Input to: %@";
+"panel.title_app_window" = "Input to: %@ - %@";
+"panel.title_orphaned" = "⚠ Target window closed — please copy text and close";
+"panel.title_eviction" = "⚠ Panel limit reached — please copy text and close to free space";
+
+/* InputPanel - Hints & Alerts */
+"panel.hint_text_cleared" = "Text cleared. Press ESC again to close";
+"panel.alert_close_title" = "Are you sure?";
+"panel.alert_close_message" = "There is unsent text in the input area. It will be lost if you close.";
+"panel.alert_close_confirm" = "Close";
+"panel.alert_close_cancel" = "Cancel";
+
+/* AppDelegate - Target Changed Alert */
+"alert.target_changed_title" = "Target window may have changed";
+"alert.target_changed_message" = "Original target \"%@\" is no longer the frontmost window.\nCurrent window is \"%@\".\n\nDo you still want to send the text?";
+"alert.target_changed_send" = "Send";
+"alert.target_changed_cancel" = "Cancel";
+
+/* AppDelegate - Accessibility Alert */
+"alert.accessibility_title" = "Accessibility Permission Required";
+"alert.accessibility_message" = "IMEHelper needs Accessibility permission to detect input method switching and cursor position.\n\nPlease go to System Settings → Privacy & Security → Accessibility, and add IMEHelper to the allowed list.";
+"alert.accessibility_open_settings" = "Open System Settings";
+"alert.accessibility_later" = "Later";
+
+/* Settings Window */
+"settings.title" = "IMEHelper Settings";
+"settings.hotkey" = "Hotkey:";
+"settings.hotkey_reset" = "Reset";
+"settings.position" = "Panel Position:";
+"settings.position_caret" = "Follow Text Cursor";
+"settings.position_center" = "Screen Center";
+"settings.position_remember" = "Remember Last Position";
+"settings.font_size" = "Font Size:";
+"settings.alpha" = "Panel Opacity:";
+"settings.focus_strip" = "Focus Strip:";
+"settings.max_panels" = "Panel Limit:";
+"settings.launch_at_login" = "Launch at Login";
+"settings.note" = "Changes take effect immediately";
+
+/* Panel Manager Window */
+"manager.title" = "Panel Manager";
+"manager.orphaned_suffix" = "%@ ⚠ Lost target";
+"manager.unknown_app" = "Unknown";
+"manager.empty_state" = "No input panels";
+"manager.close" = "Close";
+"manager.copy" = "Copy";
+"manager.copied" = "Copied";
+"manager.close_all" = "Close All";
+"manager.close_all_confirm" = "Close all panels?";
+"manager.close_all_button" = "Close All";
+"manager.close_all_message" = "Text in %d panels will be lost.";
+"manager.cancel" = "Cancel";
+"manager.close_orphaned" = "Close Orphaned";
+"manager.close_orphaned_confirm" = "Close all orphaned panels?";
+"manager.close_orphaned_button" = "Close Orphaned";
+"manager.close_orphaned_message" = "Text in %d orphaned panels will be lost.";
+
+/* Hotkey Recorder */
+"hotkey.unsupported" = "Unsupported combination";
+"hotkey.prompt" = "Press a shortcut key…";
+
+/* ESC State Machine */
+"esc.clear_then_close" = "Press ESC again to clear text, then again to close";
+"esc.close" = "Press ESC again to close";
+
+/* Source App Info */
+"source.unknown_app" = "Unknown App";

@@ -62,7 +62,7 @@ struct SourceAppInfo {
         }
 
         let pid = frontApp.processIdentifier
-        let appName = frontApp.localizedName ?? "未知 App"
+        let appName = frontApp.localizedName ?? NSLocalizedString("source.unknown_app", comment: "")
         let bundleId = frontApp.bundleIdentifier
         let windowInfo = getWindowInfo(pid: pid)
 
@@ -84,7 +84,7 @@ struct SourceAppInfo {
             return nil
         }
 
-        let appName = app.localizedName ?? "未知 App"
+        let appName = app.localizedName ?? NSLocalizedString("source.unknown_app", comment: "")
         let bundleId = app.bundleIdentifier
         let windowInfo = getWindowInfo(pid: pid)
 

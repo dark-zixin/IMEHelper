@@ -41,7 +41,7 @@ class PanelManagerWindowController: NSWindowController {
             backing: .buffered,
             defer: false
         )
-        window.title = "窗口管理"
+        window.title = NSLocalizedString("manager.title", comment: "")
         window.isReleasedWhenClosed = false
         window.minSize = NSSize(width: 400, height: 250)
 
@@ -97,7 +97,7 @@ struct PanelItem: Identifiable {
 
     /// 顯示用的 app 名稱（孤立時加標示）
     var displayAppName: String {
-        isOrphaned ? "\(appName) ⚠ 已失去目標" : appName
+        isOrphaned ? String(format: NSLocalizedString("manager.orphaned_suffix", comment: ""), appName) : appName
     }
 }
 
@@ -128,7 +128,7 @@ struct PanelManagerView: View {
                 let panel = binding.panel
                 return PanelItem(
                     id: binding.bindingKey,
-                    appName: panel.lastAppName.isEmpty ? "未知" : panel.lastAppName,
+                    appName: panel.lastAppName.isEmpty ? NSLocalizedString("manager.unknown_app", comment: "") : panel.lastAppName,
                     windowTitle: panel.lastWindowTitle,
                     fullText: panel.text,
                     isOrphaned: panel.isOrphaned,
@@ -155,7 +155,7 @@ struct PanelManagerView: View {
         VStack(spacing: 0) {
             if items.isEmpty {
                 Spacer()
-                Text("目前沒有輸入窗口")
+                Text(NSLocalizedString("manager.empty_state", comment: ""))
                     .foregroundStyle(.secondary)
                     .font(.system(size: 14))
                 Spacer()
@@ -196,7 +196,7 @@ struct PanelManagerView: View {
 
                                     // 按鈕
                                     HStack(spacing: 4) {
-                                        Button("關閉") {
+                                        Button(NSLocalizedString("manager.close", comment: "")) {
                                             // 關閉真實 panel 並清除 binding（不觸發焦點回跳）
                                             if let appDelegate = NSApp.delegate as? AppDelegate,
                                                let binding = appDelegate.windowManager.allBindings.first(where: { $0.bindingKey == item.id }) {
@@ -213,7 +213,7 @@ struct PanelManagerView: View {
                                         }
                                         .font(.system(size: 11))
 
-                                        Button(copiedId == item.id ? "已複製" : "複製") {
+                                        Button(copiedId == item.id ? NSLocalizedString("manager.copied", comment: "") : NSLocalizedString("manager.copy", comment: "")) {
                                             NSPasteboard.general.clearContents()
                                             NSPasteboard.general.setString(item.fullText, forType: .string)
                                             copiedId = item.id
@@ -254,11 +254,11 @@ struct PanelManagerView: View {
 
                 // 底部工具列
                 HStack {
-                    Button("全部關閉") {
+                    Button(NSLocalizedString("manager.close_all", comment: "")) {
                         showCloseAllAlert = true
                     }
-                    .alert("確定要關閉所有窗口嗎？", isPresented: $showCloseAllAlert) {
-                        Button("關閉全部", role: .destructive) {
+                    .alert(NSLocalizedString("manager.close_all_confirm", comment: ""), isPresented: $showCloseAllAlert) {
+                        Button(NSLocalizedString("manager.close_all_button", comment: ""), role: .destructive) {
                             if let appDelegate = NSApp.delegate as? AppDelegate {
                                 for item in items {
                                     if let binding = appDelegate.windowManager.allBindings.first(where: { $0.bindingKey == item.id }) {
@@ -272,17 +272,17 @@ struct PanelManagerView: View {
                             expandedId = nil
                             loadData()
                         }
-                        Button("取消", role: .cancel) {}
+                        Button(NSLocalizedString("manager.cancel", comment: ""), role: .cancel) {}
                     } message: {
-                        Text("共 \(items.count) 個窗口的文字將會遺失。")
+                        Text(String(format: NSLocalizedString("manager.close_all_message", comment: ""), items.count))
                     }
 
-                    Button("關閉孤立") {
+                    Button(NSLocalizedString("manager.close_orphaned", comment: "")) {
                         showCloseOrphanedAlert = true
                     }
                     .disabled(!items.contains { $0.isOrphaned })
-                    .alert("確定要關閉所有孤立窗口嗎？", isPresented: $showCloseOrphanedAlert) {
-                        Button("關閉孤立", role: .destructive) {
+                    .alert(NSLocalizedString("manager.close_orphaned_confirm", comment: ""), isPresented: $showCloseOrphanedAlert) {
+                        Button(NSLocalizedString("manager.close_orphaned_button", comment: ""), role: .destructive) {
                             if let appDelegate = NSApp.delegate as? AppDelegate {
                                 for item in items where item.isOrphaned {
                                     if let binding = appDelegate.windowManager.allBindings.first(where: { $0.bindingKey == item.id }) {
@@ -296,10 +296,10 @@ struct PanelManagerView: View {
                             expandedId = nil
                             loadData()
                         }
-                        Button("取消", role: .cancel) {}
+                        Button(NSLocalizedString("manager.cancel", comment: ""), role: .cancel) {}
                     } message: {
                         let count = items.filter { $0.isOrphaned }.count
-                        Text("共 \(count) 個孤立窗口的文字將會遺失。")
+                        Text(String(format: NSLocalizedString("manager.close_orphaned_message", comment: ""), count))
                     }
 
                     Spacer()
@@ -331,7 +331,7 @@ struct PanelManagerView: View {
             loadData()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { notification in
-            if let window = notification.object as? NSWindow, window.title == "窗口管理" {
+            if let window = notification.object as? NSWindow, window.title == NSLocalizedString("manager.title", comment: "") {
                 loadData()
             }
         }

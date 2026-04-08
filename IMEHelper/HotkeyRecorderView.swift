@@ -146,16 +146,16 @@ class HotkeyRecorderView: NSView {
 
     /// 顯示「不支援此組合」提示，1.5 秒後恢復錄製狀態
     private func showUnsupported() {
-        label.stringValue = "不支援此組合"
+        label.stringValue = NSLocalizedString("hotkey.unsupported", comment: "")
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
             guard let self = self, self.isRecording else { return }
-            self.label.stringValue = "請按下快捷鍵…"
+            self.label.stringValue = NSLocalizedString("hotkey.prompt", comment: "")
         }
     }
 
     private func startRecording() {
         isRecording = true
-        label.stringValue = "請按下快捷鍵…"
+        label.stringValue = NSLocalizedString("hotkey.prompt", comment: "")
         updateAppearance()
         window?.makeFirstResponder(self)
         delegate?.hotkeyRecorderDidStartRecording(self)

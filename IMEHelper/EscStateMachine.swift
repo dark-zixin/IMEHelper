@@ -54,9 +54,9 @@ class EscStateMachine {
             state = .warned
             lastTransitionTime = Date()
             if hasText {
-                return .showWarning(message: "再按一次 ESC 清空文字，再按一次關閉視窗")
+                return .showWarning(message: NSLocalizedString("esc.clear_then_close", comment: ""))
             } else {
-                return .showWarning(message: "再按一次 ESC 關閉視窗")
+                return .showWarning(message: NSLocalizedString("esc.close", comment: ""))
             }
 
         case .warned:
