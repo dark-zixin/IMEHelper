@@ -340,7 +340,14 @@ class SettingsWindowController: NSWindowController {
     }
 
     @objc private func focusStripColorChanged(_ sender: NSColorWell) {
+        // 如果任何 InputPanel 是 key window，代表是 NSColorPanel 自動同步觸發的，忽略
+        if NSApp.keyWindow is InputPanel { return }
         SettingsManager.shared.focusStripColor = sender.color
+    }
+
+    /// 從 SettingsManager 還原色塊顯示（被 NSColorPanel 同步覆蓋時使用）
+    func restoreColorWell() {
+        focusStripColorWell.color = SettingsManager.shared.focusStripColor
     }
 
     @objc private func launchAtLoginChanged(_ sender: NSButton) {

@@ -609,6 +609,15 @@ class InputPanel: NSPanel {
         super.becomeKey()
         focusStripView?.isHidden = false
         updateAlphaForFocusState()
+
+        // 關閉 NSColorPanel 並還原設定視窗的色塊顯示
+        if NSColorPanel.shared.isVisible {
+            NSColorPanel.shared.orderOut(nil)
+        }
+        // 每次取得焦點都還原色塊（防止 NSColorPanel 同步覆蓋）
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            SettingsWindowController.shared?.restoreColorWell()
+        }
     }
 
     override func resignKey() {

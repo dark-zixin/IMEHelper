@@ -21,6 +21,11 @@ class InputTextView: NSTextView {
     /// 輸入事件委派
     weak var inputDelegate: InputTextViewDelegate?
 
+    /// 防止 NSColorPanel 影響文字顏色
+    override func changeColor(_ sender: Any?) {
+        // 不做任何事，阻擋 NSColorPanel 的 changeColor 廣播
+    }
+
     override func keyDown(with event: NSEvent) {
         let keyCode = event.keyCode
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
