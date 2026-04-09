@@ -11,5 +11,16 @@ xcuserdata/
 # Claude Code
 .claude/
 
+# AI 知識庫
+.ai-knowledge/
+
+# 開發測試腳本
+doc/
+
+# 打包產物
+*.dmg
+*.app
+*.zip
+
 # 備份
 _old_empty/

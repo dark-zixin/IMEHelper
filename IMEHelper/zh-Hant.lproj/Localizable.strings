@@ -1,0 +1,74 @@
+/* Menu Bar */
+"menu.settings" = "設定...";
+"menu.panel_manager" = "窗口管理...";
+"menu.quit" = "結束 IMEHelper";
+
+/* InputPanel - Window Title */
+"panel.default_title" = "IMEHelper 輸入面板";
+"panel.title_app" = "輸入到：%@";
+"panel.title_app_window" = "輸入到：%@ - %@";
+"panel.title_orphaned" = "⚠ 目標視窗已關閉 — 請手動複製文字後關閉";
+"panel.title_eviction" = "⚠ 窗口數量已達上限 — 請複製文字後關閉以釋放空間";
+
+/* InputPanel - Hints & Alerts */
+"panel.hint_text_cleared" = "文字已清空，再按一次 ESC 關閉視窗";
+"panel.alert_close_title" = "確定要關閉嗎？";
+"panel.alert_close_message" = "輸入區還有未送出的文字，關閉後將會遺失。";
+"panel.alert_close_confirm" = "關閉";
+"panel.alert_close_cancel" = "取消";
+
+/* AppDelegate - Target Changed Alert */
+"alert.target_changed_title" = "目標視窗可能已變更";
+"alert.target_changed_message" = "原始目標「%@」已不是目前的前景視窗。\n目前為「%@」。\n\n是否仍要送出文字？";
+"alert.target_changed_send" = "送出";
+"alert.target_changed_cancel" = "取消";
+
+/* AppDelegate - Accessibility Alert */
+"alert.accessibility_title" = "需要輔助使用權限";
+"alert.accessibility_message" = "IMEHelper 需要「輔助使用」權限才能偵測輸入法切換和游標位置。\n\n請前往「系統設定 → 隱私權與安全性 → 輔助使用」，將 IMEHelper 加入允許清單。";
+"alert.accessibility_open_settings" = "開啟系統設定";
+"alert.accessibility_later" = "稍後再說";
+
+/* Settings Window */
+"settings.title" = "IMEHelper 設定";
+"settings.hotkey" = "快捷鍵：";
+"settings.hotkey_reset" = "重設";
+"settings.position" = "窗口位置：";
+"settings.position_caret" = "跟著文字游標";
+"settings.position_center" = "螢幕中央";
+"settings.position_remember" = "記住上次位置";
+"settings.font_size" = "文字大小：";
+"settings.alpha" = "窗口透明度：";
+"settings.focus_strip" = "焦點色帶：";
+"settings.max_panels" = "窗口上限：";
+"settings.launch_at_login" = "開機時自動啟動";
+"settings.note" = "設定變更會立即生效";
+
+/* Panel Manager Window */
+"manager.title" = "窗口管理";
+"manager.orphaned_suffix" = "%@ ⚠ 已失去目標";
+"manager.unknown_app" = "未知";
+"manager.empty_state" = "目前沒有輸入窗口";
+"manager.close" = "關閉";
+"manager.copy" = "複製";
+"manager.copied" = "已複製";
+"manager.close_all" = "全部關閉";
+"manager.close_all_confirm" = "確定要關閉所有窗口嗎？";
+"manager.close_all_button" = "關閉全部";
+"manager.close_all_message" = "共 %d 個窗口的文字將會遺失。";
+"manager.cancel" = "取消";
+"manager.close_orphaned" = "關閉孤立";
+"manager.close_orphaned_confirm" = "確定要關閉所有孤立窗口嗎？";
+"manager.close_orphaned_button" = "關閉孤立";
+"manager.close_orphaned_message" = "共 %d 個孤立窗口的文字將會遺失。";
+
+/* Hotkey Recorder */
+"hotkey.unsupported" = "不支援此組合";
+"hotkey.prompt" = "請按下快捷鍵…";
+
+/* ESC State Machine */
+"esc.clear_then_close" = "再按一次 ESC 清空文字，再按一次關閉視窗";
+"esc.close" = "再按一次 ESC 關閉視窗";
+
+/* Source App Info */
+"source.unknown_app" = "未知 App";
