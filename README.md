@@ -7,6 +7,8 @@
 
 A lightweight macOS utility that provides a floating input panel for typing in CJK and other IME-dependent languages, then inserting the text back into any app.
 
+**[Download Latest Release](https://github.com/dark-zixin/IMEHelper/releases/latest)**
+
 ![Demo](assets/demo.gif)
 
 ## The Problem

@@ -7,6 +7,8 @@
 
 輕量級 macOS 工具，提供浮動輸入面板，讓你在任何 app 中使用中日韓等需要輸入法組字的語言，再將文字回填到原本的 app。
 
+**[下載最新版本](https://github.com/dark-zixin/IMEHelper/releases/latest)**
+
 ![Demo](assets/demo.gif)
 
 ## 解決什麼問題
