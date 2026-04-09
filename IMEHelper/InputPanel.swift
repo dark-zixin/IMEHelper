@@ -195,8 +195,9 @@ class InputPanel: NSPanel {
         scrollView.drawsBackground = false  // 透明背景，讓玻璃效果顯現
         scrollView.borderType = .noBorder
 
-        // 建立自訂 InputTextView
-        textView = InputTextView()
+        // 建立自訂 InputTextView（給予初始寬度，macOS 14 不會自動調整）
+        let initialWidth: CGFloat = 500
+        textView = InputTextView(frame: NSRect(x: 0, y: 0, width: initialWidth, height: 48))
         textView.inputDelegate = self
         textView.isEditable = true
         textView.isSelectable = true
@@ -212,9 +213,11 @@ class InputPanel: NSPanel {
         // 設定 NSTextView 的自動換行
         textView.isHorizontallyResizable = false
         textView.isVerticallyResizable = true
+        textView.minSize = NSSize(width: initialWidth, height: 0)
+        textView.maxSize = NSSize(width: initialWidth, height: CGFloat.greatestFiniteMagnitude)
         textView.textContainer?.widthTracksTextView = true
         textView.textContainer?.containerSize = NSSize(
-            width: 0,  // 會被 widthTracksTextView 覆蓋
+            width: initialWidth,
             height: CGFloat.greatestFiniteMagnitude
         )
 

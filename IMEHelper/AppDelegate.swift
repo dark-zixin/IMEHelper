@@ -87,6 +87,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
         // 建立下拉選單
         let menu = NSMenu()
 
+        // 版本資訊（不可點擊）
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
+        let versionItem = NSMenuItem(title: "IMEHelper v\(version)", action: nil, keyEquivalent: "")
+        versionItem.isEnabled = false
+        menu.addItem(versionItem)
+        menu.addItem(NSMenuItem.separator())
+
         // 設定選項
         let settingsItem = NSMenuItem(title: NSLocalizedString("menu.settings", comment: ""), action: #selector(openSettings(_:)), keyEquivalent: "")
         settingsItem.target = self
@@ -96,8 +103,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
         let panelManagerItem = NSMenuItem(title: NSLocalizedString("menu.panel_manager", comment: ""), action: #selector(openPanelManager(_:)), keyEquivalent: "")
         panelManagerItem.target = self
         menu.addItem(panelManagerItem)
-
-
 
         menu.addItem(NSMenuItem.separator())
 
@@ -232,6 +237,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
         let panel = InputPanel()
         panel.panelDelegate = self
         panel.setSourceApp(sourceApp)
+
+
 
         // 綁定到 WindowManager
         NSLog("新建 panel: key=\(sourceApp.bindingKey)")
