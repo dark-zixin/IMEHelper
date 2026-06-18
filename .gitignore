@@ -24,3 +24,6 @@ doc/
 
 # 備份
 _old_empty/
+
+# 暫存檔
+tmp/

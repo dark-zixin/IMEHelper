@@ -76,7 +76,7 @@ IMEHelper helps users of any language that requires IME composition:
 3. Launch IMEHelper — it appears as a keyboard icon in the menu bar
 4. Grant Accessibility permission when prompted (System Settings > Privacy & Security > Accessibility)
 
-> **Note:** Since the app is not notarized, you may need to right-click > Open on first launch. This is only required once.
+> **Note:** The app is signed and notarized by Apple, so it opens directly. No right-click "Open" or security workaround is needed on first launch.
 
 ## Usage
 
