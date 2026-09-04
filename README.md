@@ -30,7 +30,7 @@ This affects **Chinese, Japanese, Korean, Vietnamese**, and other languages that
 
 Each window and tab gets its own independent draft, so you can switch between contexts without losing text.
 
-> The text is injected via clipboard (Cmd+V). Your original clipboard content is automatically saved and restored after injection.
+> The text is injected via clipboard (Cmd+V). By default, your original clipboard content is saved and restored after injection. For remote desktops or slower apps, enable **Keep Submitted Text** in Settings to leave the submitted text on the system clipboard instead. The most recent submission can also be copied again from the menu bar for 10 minutes after sending.
 
 ## Screenshots
 
@@ -49,6 +49,9 @@ Each window and tab gets its own independent draft, so you can switch between co
 - **Smart detection** — event-driven tab/window change detection
 - **Custom hotkey** — configure your preferred shortcut
 - **Panel management** — view, copy, and manage all active panels
+- **Safer text delivery** — waits for the original app to become active and avoids overwriting clipboard changes made by other apps
+- **Optional clipboard retention** — enable **Keep Submitted Text** when an app needs more time to read the clipboard
+- **Submission recovery** — copy the most recently submitted text again from the menu bar for up to 10 minutes
 - **Focus indicator** — top edge color strip + opacity change shows focus state
 - **Customizable** — panel position, font size, opacity, focus strip color
 - **Localized** — English and Traditional Chinese
@@ -88,11 +91,13 @@ IMEHelper helps users of any language that requires IME composition:
 | Clear text | Press `ESC` once |
 | Close panel | Press `ESC` twice (or once if empty) |
 | Settings | Click menu bar icon > Settings |
+| Keep submitted text on clipboard | Click menu bar icon > Settings > enable **Keep Submitted Text** |
+| Copy the most recent submission | Click menu bar icon > **Copy Last Submission** (available for 10 minutes after sending) |
 | Panel manager | Click menu bar icon > Panel Manager |
 
 ## Known Limitations
 
-- Text injection uses the clipboard (Cmd+V). Original clipboard content is saved and restored, but clipboard-sensitive apps may be affected during the brief injection window.
+- Text injection uses the clipboard (Cmd+V). By default, original clipboard content is saved and restored, but clipboard-sensitive apps may be affected during the brief injection window. Enabling **Keep Submitted Text** intentionally replaces the previous clipboard content.
 - The input panel requires Accessibility permission. Some enterprise-managed Macs may restrict this.
 - Tab identification relies on Accessibility API attributes, which vary by app. Some apps may not be distinguishable at the tab level.
 
