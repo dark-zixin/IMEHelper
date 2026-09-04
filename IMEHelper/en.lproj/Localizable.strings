@@ -1,6 +1,7 @@
 /* Menu Bar */
 "menu.settings" = "Settings...";
 "menu.panel_manager" = "Panel Manager...";
+"menu.copy_last_submission" = "Copy Last Submission";
 "menu.quit" = "Quit IMEHelper";
 
 /* InputPanel - Window Title */
@@ -16,6 +17,8 @@
 "panel.alert_close_message" = "There is unsent text in the input area. It will be lost if you close.";
 "panel.alert_close_confirm" = "Close";
 "panel.alert_close_cancel" = "Cancel";
+"panel.hint_submission_failed" = "Couldn’t send. Your text is preserved; please try again";
+"panel.hint_submission_busy" = "The previous submission is still in progress";
 
 /* AppDelegate - Target Changed Alert */
 "alert.target_changed_title" = "Target window may have changed";
@@ -41,6 +44,8 @@
 "settings.alpha" = "Panel Opacity:";
 "settings.focus_strip" = "Focus Strip:";
 "settings.max_panels" = "Panel Limit:";
+"settings.keep_submitted_text" = "Keep Submitted Text";
+"settings.keep_submitted_text_description" = "Keep submitted text on the system clipboard instead of restoring the previous copy. Useful for remote desktops or slower apps; clipboard history tools may read this text.";
 "settings.launch_at_login" = "Launch at Login";
 "settings.note" = "Changes take effect immediately";
 

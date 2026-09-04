@@ -33,6 +33,7 @@ class SettingsManager {
         static let hotkeyKeyCode = "hotkeyKeyCode"
         static let hotkeyModifierFlags = "hotkeyModifierFlags"
         static let focusStripColor = "focusStripColor"
+        static let keepSubmittedText = "keepSubmittedText"
     }
 
     // MARK: - 設定變更通知
@@ -48,6 +49,12 @@ class SettingsManager {
 
     /// 焦點色帶顏色變更通知
     static let focusStripColorDidChangeNotification = Notification.Name("SettingsManager.focusStripColorDidChange")
+
+    /// 送出後是否保留輸入文字在系統剪貼簿
+    var keepSubmittedText: Bool {
+        get { defaults.bool(forKey: Keys.keepSubmittedText) }
+        set { defaults.set(newValue, forKey: Keys.keepSubmittedText) }
+    }
 
     /// 取得/設定窗口位置模式
     var windowPositionMode: WindowPositionMode {
@@ -135,7 +142,12 @@ class SettingsManager {
     var hotkeyKeyCode: Int64 {
         get {
             let value = defaults.object(forKey: Keys.hotkeyKeyCode)
-            return value != nil ? Int64(defaults.integer(forKey: Keys.hotkeyKeyCode)) : Self.defaultHotkeyKeyCode
+            guard value != nil else { return Self.defaultHotkeyKeyCode }
+
+            let keyCode = Int64(defaults.integer(forKey: Keys.hotkeyKeyCode))
+            let modifierFlags = UInt64(defaults.integer(forKey: Keys.hotkeyModifierFlags))
+            let hotkey = ReservedHotkey(keyCode: keyCode, modifierFlags: modifierFlags)
+            return reservedHotkeys.contains(hotkey) ? Self.defaultHotkeyKeyCode : keyCode
         }
         set {
             defaults.set(Int(newValue), forKey: Keys.hotkeyKeyCode)
@@ -146,7 +158,12 @@ class SettingsManager {
     var hotkeyModifierFlags: UInt64 {
         get {
             let value = defaults.object(forKey: Keys.hotkeyModifierFlags)
-            return value != nil ? UInt64(defaults.integer(forKey: Keys.hotkeyModifierFlags)) : Self.defaultHotkeyModifierFlags
+            guard value != nil else { return Self.defaultHotkeyModifierFlags }
+
+            let keyCode = Int64(defaults.integer(forKey: Keys.hotkeyKeyCode))
+            let modifierFlags = UInt64(defaults.integer(forKey: Keys.hotkeyModifierFlags))
+            let hotkey = ReservedHotkey(keyCode: keyCode, modifierFlags: modifierFlags)
+            return reservedHotkeys.contains(hotkey) ? Self.defaultHotkeyModifierFlags : modifierFlags
         }
         set {
             defaults.set(Int(newValue), forKey: Keys.hotkeyModifierFlags)

@@ -1,6 +1,7 @@
 /* Menu Bar */
 "menu.settings" = "設定...";
 "menu.panel_manager" = "窗口管理...";
+"menu.copy_last_submission" = "複製上次送出內容";
 "menu.quit" = "結束 IMEHelper";
 
 /* InputPanel - Window Title */
@@ -16,6 +17,8 @@
 "panel.alert_close_message" = "輸入區還有未送出的文字，關閉後將會遺失。";
 "panel.alert_close_confirm" = "關閉";
 "panel.alert_close_cancel" = "取消";
+"panel.hint_submission_failed" = "未能送出，文字已保留，請再試一次";
+"panel.hint_submission_busy" = "上一筆文字仍在送出中，請稍候";
 
 /* AppDelegate - Target Changed Alert */
 "alert.target_changed_title" = "目標視窗可能已變更";
@@ -41,6 +44,8 @@
 "settings.alpha" = "窗口透明度：";
 "settings.focus_strip" = "焦點色帶：";
 "settings.max_panels" = "窗口上限：";
+"settings.keep_submitted_text" = "保留送出文字";
+"settings.keep_submitted_text_description" = "送出後讓輸入文字留在系統剪貼簿，不還原原本複製內容。適合遠端桌面或反應較慢的 App；剪貼簿歷史工具可能會讀取此文字。";
 "settings.launch_at_login" = "開機時自動啟動";
 "settings.note" = "設定變更會立即生效";
 

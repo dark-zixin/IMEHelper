@@ -52,6 +52,9 @@ class SettingsWindowController: NSWindowController {
     /// 開機啟動 checkbox
     private var launchAtLoginCheckbox: NSButton!
 
+    /// 送出後保留文字 checkbox
+    private var keepSubmittedTextCheckbox: NSButton!
+
     /// 開啟或顯示設定視窗（單例）
     static func show() {
         // 延遲一個短時間，讓 NSStatusItem menu dismiss 完成，避免 activation 時序競爭
@@ -74,7 +77,7 @@ class SettingsWindowController: NSWindowController {
 
     convenience init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 350, height: 485),
+            contentRect: NSRect(x: 0, y: 0, width: 350, height: 565),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -100,37 +103,38 @@ class SettingsWindowController: NSWindowController {
         let padding: CGFloat = 20
         let labelWidth: CGFloat = 100
         let controlX: CGFloat = padding + labelWidth + 8
+        let upperOffset: CGFloat = 80
 
         // 快捷鍵區域
         let hotkeyLabel = createLabel(text: NSLocalizedString("settings.hotkey", comment: ""), frame: NSRect(
-            x: padding, y: 425, width: labelWidth, height: 22
+            x: padding, y: 425 + upperOffset, width: labelWidth, height: 22
         ))
         contentView.addSubview(hotkeyLabel)
 
         hotkeyRecorderView = HotkeyRecorderView(frame: NSRect(
-            x: controlX, y: 423, width: 120, height: 26
+            x: controlX, y: 423 + upperOffset, width: 120, height: 26
         ))
         hotkeyRecorderView.delegate = self
         contentView.addSubview(hotkeyRecorderView)
 
         let resetButton = NSButton(title: NSLocalizedString("settings.hotkey_reset", comment: ""), target: self, action: #selector(resetHotkey(_:)))
-        resetButton.frame = NSRect(x: controlX + 128, y: 423, width: 60, height: 26)
+        resetButton.frame = NSRect(x: controlX + 128, y: 423 + upperOffset, width: 60, height: 26)
         resetButton.bezelStyle = .rounded
         resetButton.font = NSFont.systemFont(ofSize: 12)
         contentView.addSubview(resetButton)
 
         // 分隔線
-        let separator0 = createSeparator(y: 410, width: 310, padding: padding)
+        let separator0 = createSeparator(y: 410 + upperOffset, width: 310, padding: padding)
         contentView.addSubview(separator0)
 
         // 窗口位置區域
         let positionLabel = createLabel(text: NSLocalizedString("settings.position", comment: ""), frame: NSRect(
-            x: padding, y: 377, width: labelWidth, height: 22
+            x: padding, y: 377 + upperOffset, width: labelWidth, height: 22
         ))
         contentView.addSubview(positionLabel)
 
         positionPopUpButton = NSPopUpButton(frame: NSRect(
-            x: controlX, y: 375, width: 190, height: 26
+            x: controlX, y: 375 + upperOffset, width: 190, height: 26
         ), pullsDown: false)
         positionPopUpButton.addItems(withTitles: [
             NSLocalizedString("settings.position_caret", comment: ""),
@@ -142,17 +146,17 @@ class SettingsWindowController: NSWindowController {
         contentView.addSubview(positionPopUpButton)
 
         // 分隔線
-        let separator1 = createSeparator(y: 362, width: 310, padding: padding)
+        let separator1 = createSeparator(y: 362 + upperOffset, width: 310, padding: padding)
         contentView.addSubview(separator1)
 
         // 字型大小區域
         let fontSizeLabel = createLabel(text: NSLocalizedString("settings.font_size", comment: ""), frame: NSRect(
-            x: padding, y: 329, width: labelWidth, height: 22
+            x: padding, y: 329 + upperOffset, width: labelWidth, height: 22
         ))
         contentView.addSubview(fontSizeLabel)
 
         fontSizeSlider = NSSlider(frame: NSRect(
-            x: controlX, y: 329, width: 150, height: 22
+            x: controlX, y: 329 + upperOffset, width: 150, height: 22
         ))
         fontSizeSlider.minValue = 12
         fontSizeSlider.maxValue = 36
@@ -163,23 +167,23 @@ class SettingsWindowController: NSWindowController {
 
         fontSizeValueLabel = NSTextField(labelWithString: "14")
         fontSizeValueLabel.frame = NSRect(
-            x: controlX + 155, y: 329, width: 40, height: 22
+            x: controlX + 155, y: 329 + upperOffset, width: 40, height: 22
         )
         fontSizeValueLabel.alignment = .right
         contentView.addSubview(fontSizeValueLabel)
 
         // 分隔線
-        let separator2 = createSeparator(y: 315, width: 310, padding: padding)
+        let separator2 = createSeparator(y: 315 + upperOffset, width: 310, padding: padding)
         contentView.addSubview(separator2)
 
         // 透明度區域
         let alphaLabel = createLabel(text: NSLocalizedString("settings.alpha", comment: ""), frame: NSRect(
-            x: padding, y: 282, width: labelWidth, height: 22
+            x: padding, y: 282 + upperOffset, width: labelWidth, height: 22
         ))
         contentView.addSubview(alphaLabel)
 
         alphaSlider = NSSlider(frame: NSRect(
-            x: controlX, y: 282, width: 150, height: 22
+            x: controlX, y: 282 + upperOffset, width: 150, height: 22
         ))
         alphaSlider.minValue = 0.5
         alphaSlider.maxValue = 1.0
@@ -190,23 +194,23 @@ class SettingsWindowController: NSWindowController {
 
         alphaValueLabel = NSTextField(labelWithString: "80%")
         alphaValueLabel.frame = NSRect(
-            x: controlX + 155, y: 282, width: 40, height: 22
+            x: controlX + 155, y: 282 + upperOffset, width: 40, height: 22
         )
         alphaValueLabel.alignment = .right
         contentView.addSubview(alphaValueLabel)
 
         // 分隔線
-        let separator3 = createSeparator(y: 268, width: 310, padding: padding)
+        let separator3 = createSeparator(y: 268 + upperOffset, width: 310, padding: padding)
         contentView.addSubview(separator3)
 
         // 焦點色帶顏色（標籤在上，expanded 色盤在下）
         let focusStripLabel = createLabel(text: NSLocalizedString("settings.focus_strip", comment: ""), frame: NSRect(
-            x: padding, y: 235, width: labelWidth, height: 22
+            x: padding, y: 235 + upperOffset, width: labelWidth, height: 22
         ))
         contentView.addSubview(focusStripLabel)
 
         focusStripColorWell = NSColorWell(frame: NSRect(
-            x: controlX, y: 225, width: 190, height: 38
+            x: controlX, y: 225 + upperOffset, width: 190, height: 38
         ))
         focusStripColorWell.colorWellStyle = .expanded
         focusStripColorWell.color = SettingsManager.shared.focusStripColor
@@ -215,17 +219,17 @@ class SettingsWindowController: NSWindowController {
         contentView.addSubview(focusStripColorWell)
 
         // 分隔線
-        let separator3b = createSeparator(y: 213, width: 310, padding: padding)
+        let separator3b = createSeparator(y: 213 + upperOffset, width: 310, padding: padding)
         contentView.addSubview(separator3b)
 
         // 窗口上限區域
         let maxPanelLabel = createLabel(text: NSLocalizedString("settings.max_panels", comment: ""), frame: NSRect(
-            x: padding, y: 180, width: labelWidth, height: 22
+            x: padding, y: 180 + upperOffset, width: labelWidth, height: 22
         ))
         contentView.addSubview(maxPanelLabel)
 
         maxPanelSlider = NSSlider(frame: NSRect(
-            x: controlX, y: 180, width: 150, height: 22
+            x: controlX, y: 180 + upperOffset, width: 150, height: 22
         ))
         maxPanelSlider.minValue = 5
         maxPanelSlider.maxValue = 50
@@ -237,19 +241,39 @@ class SettingsWindowController: NSWindowController {
 
         maxPanelValueLabel = NSTextField(labelWithString: "20")
         maxPanelValueLabel.frame = NSRect(
-            x: controlX + 155, y: 180, width: 40, height: 22
+            x: controlX + 155, y: 180 + upperOffset, width: 40, height: 22
         )
         maxPanelValueLabel.alignment = .right
         contentView.addSubview(maxPanelValueLabel)
 
         // 分隔線
-        let separator4 = createSeparator(y: 166, width: 310, padding: padding)
+        let separator4 = createSeparator(y: 166 + upperOffset, width: 310, padding: padding)
         contentView.addSubview(separator4)
+
+        // 送出後保留文字
+        keepSubmittedTextCheckbox = NSButton(
+            checkboxWithTitle: NSLocalizedString("settings.keep_submitted_text", comment: ""),
+            target: self,
+            action: #selector(keepSubmittedTextChanged(_:))
+        )
+        keepSubmittedTextCheckbox.frame = NSRect(x: padding, y: 211, width: 310, height: 22)
+        contentView.addSubview(keepSubmittedTextCheckbox)
+
+        let keepSubmittedTextDescription = NSTextField(
+            wrappingLabelWithString: NSLocalizedString("settings.keep_submitted_text_description", comment: "")
+        )
+        keepSubmittedTextDescription.frame = NSRect(x: padding + 20, y: 158, width: 290, height: 46)
+        keepSubmittedTextDescription.font = NSFont.systemFont(ofSize: 11)
+        keepSubmittedTextDescription.textColor = NSColor.secondaryLabelColor
+        contentView.addSubview(keepSubmittedTextDescription)
+
+        let separator5 = createSeparator(y: 145, width: 310, padding: padding)
+        contentView.addSubview(separator5)
 
         // 開機啟動
         launchAtLoginCheckbox = NSButton(checkboxWithTitle: NSLocalizedString("settings.launch_at_login", comment: ""), target: self, action: #selector(launchAtLoginChanged(_:)))
         launchAtLoginCheckbox.frame = NSRect(
-            x: padding, y: 133, width: 200, height: 22
+            x: padding, y: 112, width: 200, height: 22
         )
         contentView.addSubview(launchAtLoginCheckbox)
 
@@ -298,6 +322,9 @@ class SettingsWindowController: NSWindowController {
         maxPanelSlider.integerValue = settings.maxPanelCount
         updateMaxPanelLabel()
 
+        // 送出後保留文字
+        keepSubmittedTextCheckbox.state = settings.keepSubmittedText ? .on : .off
+
         // 開機啟動
         launchAtLoginCheckbox.state = SMAppService.mainApp.status == .enabled ? .on : .off
     }
@@ -343,6 +370,10 @@ class SettingsWindowController: NSWindowController {
         // 如果任何 InputPanel 是 key window，代表是 NSColorPanel 自動同步觸發的，忽略
         if NSApp.keyWindow is InputPanel { return }
         SettingsManager.shared.focusStripColor = sender.color
+    }
+
+    @objc private func keepSubmittedTextChanged(_ sender: NSButton) {
+        SettingsManager.shared.keepSubmittedText = sender.state == .on
     }
 
     /// 從 SettingsManager 還原色塊顯示（被 NSColorPanel 同步覆蓋時使用）

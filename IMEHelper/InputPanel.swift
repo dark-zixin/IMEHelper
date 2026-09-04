@@ -264,6 +264,7 @@ class InputPanel: NSPanel {
 
     /// 標記為孤立狀態（目標視窗已關閉），更新標題列提示
     func markAsOrphaned() {
+        isInjecting = false
         isOrphaned = true
         sourceAppInfo = nil  // 清掉來源，關閉時不切焦點
         self.hidesOnDeactivate = false  // 不隨 app 失焦自動隱藏
@@ -376,6 +377,16 @@ class InputPanel: NSPanel {
     func resetEscState() {
         escStateMachine.reset()
         hideHintLabel()
+    }
+
+    /// 顯示可重試的送出失敗提示，輸入內容與來源綁定都保持不變
+    func showRecoverableSubmissionFailure() {
+        showHintLabel(message: NSLocalizedString("panel.hint_submission_failed", comment: ""))
+    }
+
+    /// 顯示上一筆交易尚未結束的提示
+    func showSubmissionBusy() {
+        showHintLabel(message: NSLocalizedString("panel.hint_submission_busy", comment: ""))
     }
 
     // MARK: - 私有方法
@@ -637,6 +648,11 @@ extension InputPanel: InputTextViewDelegate {
     func inputTextViewDidPressEnter(_ textView: InputTextView) {
         // 淘汰候選或孤立 panel 不能送出，只能複製和關閉
         if isOrphaned {
+            return
+        }
+
+        guard !isInjecting else {
+            showSubmissionBusy()
             return
         }
 

@@ -33,6 +33,7 @@ let reservedHotkeys: Set<ReservedHotkey> = {
         ReservedHotkey(keyCode: 13, modifierFlags: cmd),              // Cmd+W
         ReservedHotkey(keyCode: 4, modifierFlags: cmd),               // Cmd+H
         ReservedHotkey(keyCode: 46, modifierFlags: cmd),              // Cmd+M
+        ReservedHotkey(keyCode: 9, modifierFlags: cmd),               // Cmd+V（文字送出使用）
         ReservedHotkey(keyCode: 53, modifierFlags: cmd | opt),        // Cmd+Option+Esc
         // 螢幕截圖
         ReservedHotkey(keyCode: 20, modifierFlags: cmd | shift),      // Cmd+Shift+3

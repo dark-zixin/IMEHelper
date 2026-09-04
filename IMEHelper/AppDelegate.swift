@@ -10,7 +10,12 @@ import ApplicationServices
 import SwiftUI
 
 @main
-class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate, NSMenuItemValidation {
+
+    private struct RecentSubmission {
+        let text: String
+        let submittedAt: Date
+    }
 
     // Menu Bar 狀態列項目
     private var statusItem: NSStatusItem!
@@ -33,6 +38,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
 
     // 文字回填進行中旗標，抑制自動恢復
     private var isInjecting: Bool = false
+
+    // 最近一次已分派的送出內容，只保留於記憶體
+    private var recentSubmission: RecentSubmission?
+    private let recentSubmissionLifetime: TimeInterval = 10 * 60
 
     // scheduleCheck 防重複執行旗標
     private var isChecking = false
@@ -66,6 +75,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
     }
 
     func applicationWillTerminate(_ aNotification: Notification) {
+        recentSubmission = nil
+        textInjector.prepareForTermination()
         hotkeyManager?.stop()
         windowTitleCheckTimer?.invalidate()
     }
@@ -106,6 +117,17 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
 
         menu.addItem(NSMenuItem.separator())
 
+        // 最近送出內容只在 10 分鐘內可複製，無資料時保留項目但停用
+        let copyLastSubmissionItem = NSMenuItem(
+            title: NSLocalizedString("menu.copy_last_submission", comment: ""),
+            action: #selector(copyLastSubmission(_:)),
+            keyEquivalent: ""
+        )
+        copyLastSubmissionItem.target = self
+        menu.addItem(copyLastSubmissionItem)
+
+        menu.addItem(NSMenuItem.separator())
+
         // 結束應用程式
         let quitItem = NSMenuItem(
             title: NSLocalizedString("menu.quit", comment: ""),
@@ -127,6 +149,34 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
     /// 開啟窗口管理視窗
     @objc private func openPanelManager(_ sender: Any?) {
         PanelManagerWindowController.show()
+    }
+
+    /// 將最近一次已分派的文字複製到系統剪貼簿
+    @objc private func copyLastSubmission(_ sender: Any?) {
+        guard !textInjector.isActive,
+              let submission = currentRecentSubmission() else {
+            return
+        }
+
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(submission.text, forType: .string)
+    }
+
+    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        guard menuItem.action == #selector(copyLastSubmission(_:)) else {
+            return true
+        }
+        return !textInjector.isActive && currentRecentSubmission() != nil
+    }
+
+    private func currentRecentSubmission() -> RecentSubmission? {
+        guard let submission = recentSubmission else { return nil }
+        guard Date().timeIntervalSince(submission.submittedAt) < recentSubmissionLifetime else {
+            recentSubmission = nil
+            return nil
+        }
+        return submission
     }
 
     // MARK: - 全域快捷鍵
@@ -168,6 +218,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
 
     /// 處理快捷鍵觸發事件
     private func handleHotkeyPressed() {
+        // 送出交易進行中不切換或建立輸入窗口，避免焦點及剪貼簿被第二筆操作干擾
+        guard !textInjector.isActive, !isInjecting else {
+            NSLog("[Injection] txID=active phase=none reason=busyRejected result=ignoredHotkey")
+            return
+        }
+
         // 取得來源 app 資訊（在建立 panel 之前，因為 panel 顯示後前景 app 會變成自己）
         let sourceApp = SourceAppInfo.fromFrontmostApp()
 
@@ -408,9 +464,17 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
     func inputPanelDidSubmit(_ panel: InputPanel, text: String) {
         NSLog("AppDelegate: 收到送出文字，長度 \(text.count)")
 
+        guard !textInjector.isActive else {
+            panel.showSubmissionBusy()
+            return
+        }
+
         guard let sourceInfo = panel.sourceAppInfo else {
             NSLog("AppDelegate: 沒有來源 app 資訊，無法回填")
-            panel.hidePanel()
+            panel.markAsOrphaned()
+            NSApp.activate(ignoringOtherApps: true)
+            panel.makeKeyAndOrderFront(nil)
+            panel.focusTextView()
             return
         }
 
@@ -450,25 +514,45 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate {
         panel.resetEscState()
 
         // 用 TextInjector 回填文字
-        textInjector.inject(text: text, targetPID: sourceInfo.pid) { [weak self] success in
-            guard let self = self else { return }
+        textInjector.inject(
+            text: text,
+            targetPID: sourceInfo.pid,
+            keepSubmittedText: SettingsManager.shared.keepSubmittedText
+        ) { [weak self, weak panel] result in
+            guard let self = self, let panel = panel else { return }
             self.isInjecting = false
 
-            if success {
-                // 回填成功，清空文字、移除綁定、關閉 panel
+            switch result {
+            case .dispatchedUnconfirmed:
+                // 系統沒有跨 App 的貼上完成回報；事件成功分派後保留短期備援
+                self.recentSubmission = RecentSubmission(text: text, submittedAt: Date())
                 panel.text = ""
                 panel.isInjecting = false
                 self.windowManager.remove(panel: panel)
                 panel.hidePanel()
-                NSLog("AppDelegate: 文字回填完成")
-            } else {
-                // 回填失敗，標記為孤立並重新顯示（binding 保留，管理視窗可看到）
+                NSLog("AppDelegate: 文字送出事件已分派")
+
+            case .recoverableFailure:
                 panel.isInjecting = false
+                NSApp.activate(ignoringOtherApps: true)
+                panel.makeKeyAndOrderFront(nil)
+                panel.focusTextView()
+                panel.showRecoverableSubmissionFailure()
+                NSLog("AppDelegate: 送出前失敗，已保留文字供重試")
+
+            case .orphaned:
                 panel.markAsOrphaned()
                 NSApp.activate(ignoringOtherApps: true)
                 panel.makeKeyAndOrderFront(nil)
                 panel.focusTextView()
-                NSLog("AppDelegate: 回填失敗，已重新顯示 panel")
+                NSLog("AppDelegate: 目標已結束，輸入窗口已標記為孤立")
+
+            case .busyRejected:
+                panel.isInjecting = false
+                NSApp.activate(ignoringOtherApps: true)
+                panel.makeKeyAndOrderFront(nil)
+                panel.focusTextView()
+                panel.showSubmissionBusy()
             }
 
             if let current = SourceAppInfo.fromFrontmostApp() {

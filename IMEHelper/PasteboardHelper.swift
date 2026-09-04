@@ -7,83 +7,97 @@
 
 import Cocoa
 
-/// 剪貼簿備份項目，用於儲存每個 NSPasteboardItem 的所有 type 和 data
+/// 剪貼簿備份項目，用於保存單一項目的所有資料格式
 struct PasteboardBackupItem {
-    var typeDataMap: [NSPasteboard.PasteboardType: Data]
+    let typeDataMap: [NSPasteboard.PasteboardType: Data]
+}
+
+/// 一次剪貼簿快照，不與後續交易共用可變狀態
+struct PasteboardSnapshot {
+    let items: [PasteboardBackupItem]
+    let isComplete: Bool
+}
+
+/// 寫入剪貼簿後的核對結果
+struct PasteboardWriteResult {
+    let didSetString: Bool
+    let readbackMatches: Bool
+    let changeCount: Int
 }
 
 /// 剪貼簿操作封裝
-/// 提供備份、寫入、還原剪貼簿內容的功能
-class PasteboardHelper {
+final class PasteboardHelper {
 
-    /// 備份的剪貼簿項目
-    private var backupItems: [PasteboardBackupItem]?
-
-    /// 備份目前剪貼簿內容
-    /// 因為 NSPasteboardItem 在 pasteboard 被清空後就失效，
-    /// 所以需要手動讀取每個 type 的 data 再存到自訂結構
-    func backup() {
+    /// 建立目前剪貼簿的完整快照
+    func makeSnapshot() -> PasteboardSnapshot {
         let pasteboard = NSPasteboard.general
-
         guard let items = pasteboard.pasteboardItems else {
-            backupItems = nil
-            NSLog("PasteboardHelper: 剪貼簿為空，無需備份")
-            return
+            return PasteboardSnapshot(items: [], isComplete: true)
         }
 
-        var result: [PasteboardBackupItem] = []
-
-        for item in items {
+        var isComplete = true
+        let backupItems = items.map { item -> PasteboardBackupItem in
             var typeDataMap: [NSPasteboard.PasteboardType: Data] = [:]
-
+            if item.types.isEmpty {
+                isComplete = false
+            }
             for type in item.types {
                 if let data = item.data(forType: type) {
                     typeDataMap[type] = data
+                } else {
+                    isComplete = false
                 }
             }
-
-            if !typeDataMap.isEmpty {
-                result.append(PasteboardBackupItem(typeDataMap: typeDataMap))
-            }
+            return PasteboardBackupItem(typeDataMap: typeDataMap)
         }
 
-        backupItems = result.isEmpty ? nil : result
-        NSLog("PasteboardHelper: 已備份 \(result.count) 個剪貼簿項目")
+        return PasteboardSnapshot(items: backupItems, isComplete: isComplete)
     }
 
-    /// 將文字寫入剪貼簿
-    func write(text: String) {
+    /// 將文字寫入剪貼簿，並立即讀回核對
+    func write(text: String) -> PasteboardWriteResult {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
-        pasteboard.setString(text, forType: .string)
-        NSLog("PasteboardHelper: 已寫入文字到剪貼簿，長度 \(text.count)")
+        let didSetString = pasteboard.setString(text, forType: .string)
+        let readbackMatches = pasteboard.string(forType: .string) == text
+
+        return PasteboardWriteResult(
+            didSetString: didSetString,
+            readbackMatches: readbackMatches,
+            changeCount: pasteboard.changeCount
+        )
     }
 
-    /// 還原備份的剪貼簿內容
-    func restore() {
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
+    /// 目前純文字是否仍是本次要送出的內容
+    func contains(text: String) -> Bool {
+        NSPasteboard.general.string(forType: .string) == text
+    }
 
-        guard let items = backupItems else {
-            NSLog("PasteboardHelper: 沒有備份，已清空剪貼簿")
-            return
-        }
+    /// 目前剪貼簿版本
+    var changeCount: Int {
+        NSPasteboard.general.changeCount
+    }
 
-        // 將備份的資料寫回剪貼簿
+    /// 還原指定快照
+    @discardableResult
+    func restore(_ snapshot: PasteboardSnapshot) -> Bool {
         var pasteboardItems: [NSPasteboardItem] = []
-
-        for backupItem in items {
-            let newItem = NSPasteboardItem()
-
+        for backupItem in snapshot.items {
+            let item = NSPasteboardItem()
             for (type, data) in backupItem.typeDataMap {
-                newItem.setData(data, forType: type)
+                guard item.setData(data, forType: type) else {
+                    return false
+                }
             }
-
-            pasteboardItems.append(newItem)
+            pasteboardItems.append(item)
         }
 
-        pasteboard.writeObjects(pasteboardItems)
-        backupItems = nil
-        NSLog("PasteboardHelper: 已還原 \(pasteboardItems.count) 個剪貼簿項目")
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        guard !snapshot.items.isEmpty else {
+            return true
+        }
+
+        return pasteboard.writeObjects(pasteboardItems)
     }
 }
