@@ -77,3 +77,58 @@
 
 /* Source App Info */
 "source.unknown_app" = "未知 App";
+
+// 倉頡查碼窗
+"menu.cangjie_lookup" = "倉頡查碼…";
+"lookup.title" = "倉頡查碼";
+"lookup.input" = "查詢文字";
+"lookup.pin" = "置頂";
+"lookup.save" = "存";
+"lookup.result" = "逐字倉頡碼";
+"lookup.saved" = "已存的字";
+"lookup.saved_count" = "已存清單（%ld）";
+"lookup.retry" = "重試";
+"lookup.space" = "〔空格〕";
+"lookup.newline" = "〔換行〕";
+"lookup.tab" = "〔定位字元〕";
+"lookup.not_found" = "未收錄";
+"lookup.empty_input" = "字根會顯示在這裡";
+"lookup.empty_saved" = "按字旁的「存」保存。";
+"lookup.offline" = "離線查碼・倉頡五代";
+"lookup.saved_success" = "已儲存。";
+"lookup.deleted_success" = "已刪除。";
+"lookup.dictionary_error" = "無法載入倉頡碼表，請重試或重新開啟 app。";
+"lookup.load_error" = "無法讀取已存清單，原檔已保留，目前不能存檔。請先看恢復說明，再重試。";
+"lookup.save_error" = "無法儲存，輸入文字與原有清單都已保留，請稍後再試。";
+"lookup.delete_error" = "無法刪除，這筆資料仍保留在清單中，請稍後再試。";
+"lookup.expand" = "查看";
+"lookup.collapse" = "收起";
+"lookup.delete" = "刪除";
+"lookup.cancel" = "取消";
+"lookup.saved_details" = "已存原文與倉頡碼";
+"lookup.delete_title" = "刪除這筆已存資料？";
+"lookup.delete_message" = "會從已存的字移除。";
+
+"lookup.recent" = "近期";
+
+"lookup.other" = "其他";
+
+"lookup.empty_other" = "沒有其他已存的字";
+
+"lookup.manage" = "管理";
+
+"lookup.done" = "完成";
+
+"lookup.save_character" = "存「%@」";
+
+"lookup.delete_character" = "刪除「%@」？";
+
+"lookup.expand_saved" = "展開已存的字";
+
+"lookup.collapse_saved" = "收合已存的字";
+
+"lookup.saved_short" = "已存";
+"lookup.saved_character" = "已存「%@」；再存可移到近期";
+"lookup.saved_unavailable" = "已存的字無法讀取";
+"lookup.recovery_help" = "恢復說明";
+"lookup.recovery_help_error" = "無法開啟恢復說明，請查看 README 的清單恢復章節。原檔保持不變。";

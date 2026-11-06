@@ -115,6 +115,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate, NSMenuIt
         panelManagerItem.target = self
         menu.addItem(panelManagerItem)
 
+        let lookupItem = NSMenuItem(title: NSLocalizedString("menu.cangjie_lookup", comment: ""), action: #selector(openCangjieLookup(_:)), keyEquivalent: "")
+        lookupItem.target = self
+        menu.addItem(lookupItem)
+
         menu.addItem(NSMenuItem.separator())
 
         // 最近送出內容只在 10 分鐘內可複製，無資料時保留項目但停用
@@ -149,6 +153,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate, NSMenuIt
     /// 開啟窗口管理視窗
     @objc private func openPanelManager(_ sender: Any?) {
         PanelManagerWindowController.show()
+    }
+
+    @objc private func openCangjieLookup(_ sender: Any?) {
+        CangjieLookupWindowController.show()
     }
 
     /// 將最近一次已分派的文字複製到系統剪貼簿
@@ -223,6 +231,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate, NSMenuIt
             NSLog("[Injection] txID=active phase=none reason=busyRejected result=ignoredHotkey")
             return
         }
+
+        // 查碼窗沒有回填對象；僅略過此視窗，保留輸入面板原本的開關行為。
+        guard !CangjieLookupWindowController.isKeyWindow else { return }
 
         // 取得來源 app 資訊（在建立 panel 之前，因為 panel 顯示後前景 app 會變成自己）
         let sourceApp = SourceAppInfo.fromFrontmostApp()

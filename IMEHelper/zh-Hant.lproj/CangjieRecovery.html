@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="zh-Hant">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>倉頡已存清單恢復說明</title>
+<style>:root{color-scheme:light dark;font:18px/1.7 system-ui}body{max-width:44em;margin:3em auto;padding:0 1.3em}h1{font-size:1.6em}code{overflow-wrap:anywhere}li{margin:.8em 0}</style>
+<h1>倉頡已存清單恢復說明</h1>
+<p>「無法讀取」表示目前不知道清單內容，不代表清單沒有資料。讀取失敗時，IMEHelper 會保留原檔並停用保存。這份說明在本機開啟，不需要網路。</p>
+<h2>先保留資料</h2>
+<ol>
+<li>結束所有 IMEHelper 程序。同一個 macOS 帳號一次只執行一個 IMEHelper，同版本也不要多開；目前沒有多程序保存衝突保護。</li>
+<li>在 Finder 選「前往」→「前往檔案夾」，輸入 <code>~/Library/Application Support/IMEHelper/</code>。</li>
+<li>先把 <code>cangjie-list.json</code> 複製到另一個資料夾備份，再檢查原檔。不要直接刪除原檔或以空檔覆蓋。</li>
+</ol>
+<h2>依原因檢查</h2>
+<ul>
+<li>若清單來自較新的 IMEHelper，使用可讀取該格式的版本；不要把版本號手動改小來繞過檢查。</li>
+<li>確認檔案及所在資料夾允許目前使用者讀寫。若備份正常，可在退出程式後從備份恢復；保留出錯檔以便比對。</li>
+<li>若曾手動編輯 JSON，檢查語法與欄位。重複的記錄編號、重複的原始字、無效字碼或舊版原文不符都會拒絕載入。不確定怎麼修時，保留備份並請協助者檢查，不要猜改內容。</li>
+<li>在「主控台」搜尋 <code>[CangjieLookup]</code> 可查看固定的 <code>reason</code> 原因，例如 <code>storeMalformed</code>、<code>storeDuplicateIdentifier</code>、<code>storeDuplicateCharacter</code>、<code>storeInvalidCharacter</code>、<code>storeInvalidCode</code>、<code>storeInvalidDate</code>、<code>storeLegacyTextMismatch</code>、<code>storeReadFailed</code> 或 <code>unsupportedVersion</code>。診斷不記錄保存的文字或檔案內文。</li>
+</ul>
+<p>完成檢查後，只啟動一個 IMEHelper，再開「倉頡查碼」。若程式仍開著，修復檔案後可按「重試」；成功讀取後才會恢復筆數及保存功能。</p>
+<h2>舊版清單轉換</h2>
+<p>舊版以整段保存的清單，讀取時會拆成單字；只讀不改原檔。第一次成功保存或刪除會寫成新版單字格式，不保留原段落分組，也不會自動備份。需要保留舊分組時，先自行備份。</p>
+</html>

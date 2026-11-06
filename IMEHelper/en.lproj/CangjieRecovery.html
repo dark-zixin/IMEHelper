@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Recover saved Cangjie characters</title>
+<style>:root{color-scheme:light dark;font:18px/1.7 system-ui}body{max-width:44em;margin:3em auto;padding:0 1.3em}h1{font-size:1.6em}code{overflow-wrap:anywhere}li{margin:.8em 0}</style>
+<h1>Recover saved Cangjie characters</h1>
+<p>“Saved unavailable” means the list could not be read, not that it is empty. IMEHelper preserves the file and disables saving after a read failure. This help page is stored locally and requires no internet connection.</p>
+<h2>Preserve your data first</h2>
+<ol>
+<li>Quit every IMEHelper process. Run only one IMEHelper at a time in the same macOS account, including copies of the same version. Concurrent saves are not protected against overwriting another process’s changes.</li>
+<li>In Finder, choose Go → Go to Folder and enter <code>~/Library/Application Support/IMEHelper/</code>.</li>
+<li>Copy <code>cangjie-list.json</code> to another folder as a backup before checking the original. Do not delete it or replace it with an empty file.</li>
+</ol>
+<h2>Check the cause</h2>
+<ul>
+<li>If a newer IMEHelper created the file, use a version that supports that format. Do not lower the format version by hand to bypass validation.</li>
+<li>Check that your account can read and write both the file and its folder. If you have a working backup, restore it after quitting IMEHelper; keep the failing file for comparison.</li>
+<li>If you edited the JSON, check its syntax and fields. Duplicate record identifiers, duplicate raw characters, invalid codes, or inconsistent legacy text are rejected. If you are unsure, keep the backup and seek help instead of guessing changes.</li>
+<li>Search Console for <code>[CangjieLookup]</code> and inspect the fixed <code>reason</code> value: for example <code>storeMalformed</code>, <code>storeDuplicateIdentifier</code>, <code>storeDuplicateCharacter</code>, <code>storeInvalidCharacter</code>, <code>storeInvalidCode</code>, <code>storeInvalidDate</code>, <code>storeLegacyTextMismatch</code>, <code>storeReadFailed</code>, or <code>unsupportedVersion</code>. Diagnostics do not include saved text or file contents.</li>
+</ul>
+<p>After checking the file, start one IMEHelper and open Cangjie Lookup. If the app is still running, choose Retry after repairing the file. The count and saving controls return only after the list loads successfully.</p>
+<h2>Legacy lists</h2>
+<p>Legacy lists containing whole passages are converted to individual characters when read. Reading alone does not change the file. The first successful save or deletion writes the new character-based format without preserving passage grouping or creating an automatic backup. Back up the old file first if you need those groups.</p>
+</html>

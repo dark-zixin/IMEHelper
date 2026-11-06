@@ -77,3 +77,58 @@
 
 /* Source App Info */
 "source.unknown_app" = "Unknown App";
+
+// 倉頡查碼窗
+"menu.cangjie_lookup" = "Cangjie Lookup…";
+"lookup.title" = "Cangjie Lookup";
+"lookup.input" = "Text to look up";
+"lookup.pin" = "Pin";
+"lookup.save" = "Save";
+"lookup.result" = "Cangjie codes";
+"lookup.saved" = "Saved";
+"lookup.saved_count" = "Saved entries (%ld)";
+"lookup.retry" = "Retry";
+"lookup.space" = "[Space]";
+"lookup.newline" = "[Newline]";
+"lookup.tab" = "[Tab]";
+"lookup.not_found" = "Not listed";
+"lookup.empty_input" = "Type a character to look up";
+"lookup.empty_saved" = "Save a character to keep it here.";
+"lookup.offline" = "Offline · Cangjie 5";
+"lookup.saved_success" = "Saved.";
+"lookup.deleted_success" = "Deleted.";
+"lookup.dictionary_error" = "Could not load the Cangjie dictionary. Try again or reopen the app.";
+"lookup.load_error" = "Could not read saved entries. The file is preserved; saving is disabled. See Recovery help, then retry.";
+"lookup.save_error" = "Could not save. Your text and previous entries are unchanged. Please try again.";
+"lookup.delete_error" = "Could not delete. The entry is still saved. Please try again.";
+"lookup.expand" = "Show";
+"lookup.collapse" = "Hide";
+"lookup.delete" = "Delete";
+"lookup.cancel" = "Cancel";
+"lookup.saved_details" = "Saved text and Cangjie codes";
+"lookup.delete_title" = "Delete this saved entry?";
+"lookup.delete_message" = "It will be removed from your saved list.";
+
+"lookup.recent" = "Recent";
+
+"lookup.other" = "Other";
+
+"lookup.empty_other" = "No other saved characters";
+
+"lookup.manage" = "Manage";
+
+"lookup.done" = "Done";
+
+"lookup.save_character" = "Save “%@”";
+
+"lookup.delete_character" = "Delete “%@”?";
+
+"lookup.expand_saved" = "Expand saved characters";
+
+"lookup.collapse_saved" = "Collapse saved characters";
+
+"lookup.saved_short" = "Saved";
+"lookup.saved_character" = "“%@” saved; save again to move it to Recent";
+"lookup.saved_unavailable" = "Saved unavailable";
+"lookup.recovery_help" = "Recovery help";
+"lookup.recovery_help_error" = "Could not open Recovery help. See the saved-list recovery section in the README. Your file is unchanged.";
