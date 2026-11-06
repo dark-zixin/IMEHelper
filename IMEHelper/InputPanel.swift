@@ -64,7 +64,12 @@ class InputPanel: NSPanel {
     var isOrphaned = false
 
     /// 是否正在回填中（不受 hideAll/tryRestore 影響）
-    var isInjecting = false
+    var isInjecting = false {
+        didSet {
+            // 等待來源 App 取得焦點時面板仍可見，保護已提交的草稿。
+            textView?.isEditable = !isInjecting
+        }
+    }
 
     /// 隱藏開始的時間（用於淘汰分數計算）
     var hiddenSince: Date?
@@ -670,6 +675,8 @@ extension InputPanel: InputTextViewDelegate {
     }
 
     func inputTextViewDidPressEscape(_ textView: InputTextView) {
+        guard !isInjecting else { return }
+
         let hasText = !textView.string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         let action = escStateMachine.handleEscape(hasText: hasText)
 
@@ -699,6 +706,8 @@ extension InputPanel: NSWindowDelegate {
         if isClosingProgrammatically {
             return true
         }
+
+        guard !isInjecting else { return false }
 
         let hasText = !textView.string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
 

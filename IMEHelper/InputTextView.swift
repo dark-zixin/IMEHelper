@@ -27,6 +27,8 @@ class InputTextView: NSTextView {
     }
 
     override func keyDown(with event: NSEvent) {
+        guard isEditable else { return }
+
         let keyCode = event.keyCode
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
 

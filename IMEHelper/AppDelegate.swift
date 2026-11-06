@@ -520,15 +520,17 @@ class AppDelegate: NSObject, NSApplicationDelegate, InputPanelDelegate, NSMenuIt
         // 標記為回填中，避免被 hideAll/tryRestore 干擾
         panel.isInjecting = true
 
-        // 隱藏視窗（但保留文字，等回填成功後才清空）
-        panel.orderOut(nil)
         panel.resetEscState()
 
         // 用 TextInjector 回填文字
         textInjector.inject(
             text: text,
             targetPID: sourceInfo.pid,
-            keepSubmittedText: SettingsManager.shared.keepSubmittedText
+            keepSubmittedText: SettingsManager.shared.keepSubmittedText,
+            onTargetActivated: { [weak panel] in
+                // 自己仍在前景時隱藏 key window，會讓查碼窗接手並短暫浮上來。
+                panel?.orderOut(nil)
+            }
         ) { [weak self, weak panel] result in
             guard let self = self, let panel = panel else { return }
             self.isInjecting = false

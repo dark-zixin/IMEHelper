@@ -41,6 +41,7 @@ final class TextInjector {
         case clipboardPrepared
         case activatingTarget
         case waitingForFrontmost
+        case targetActivated
         case dispatched
         case stabilizing
     }
@@ -52,6 +53,7 @@ final class TextInjector {
         let mode: Mode
         let snapshot: PasteboardSnapshot
         let startedAt: ContinuousClock.Instant
+        let onTargetActivated: () -> Void
         var injectedChangeCount: Int?
         var phase: Phase
     }
@@ -74,6 +76,7 @@ final class TextInjector {
         text: String,
         targetPID: pid_t,
         keepSubmittedText: Bool,
+        onTargetActivated: @escaping () -> Void,
         completion: @escaping (InjectionResult) -> Void
     ) {
         guard activeTransaction == nil else {
@@ -110,6 +113,7 @@ final class TextInjector {
             mode: keepSubmittedText ? .keepSubmittedText : .restorePreviousClipboard,
             snapshot: pasteboardHelper.makeSnapshot(),
             startedAt: clock.now,
+            onTargetActivated: onTargetActivated,
             injectedChangeCount: nil,
             phase: .started
         )
@@ -203,7 +207,10 @@ final class TextInjector {
             return
         }
 
-        if NSWorkspace.shared.frontmostApplication?.processIdentifier == transaction.targetPID {
+        if NSWorkspace.shared.frontmostApplication?.processIdentifier == transaction.targetPID,
+           !NSApp.isActive {
+            guard updateTransaction(transactionID, phase: .targetActivated) else { return }
+            transaction.onTargetActivated()
             dispatchPaste(transactionID: transactionID, completion: completion)
             return
         }
@@ -238,7 +245,8 @@ final class TextInjector {
             return
         }
 
-        guard NSWorkspace.shared.frontmostApplication?.processIdentifier == transaction.targetPID else {
+        guard NSWorkspace.shared.frontmostApplication?.processIdentifier == transaction.targetPID,
+              !NSApp.isActive else {
             finishFailure(transactionID: transactionID, reason: .frontmostTimeout, orphaned: false, completion: completion)
             return
         }
@@ -426,13 +434,14 @@ final class TextInjector {
         }
 
         NSLog(
-            "[Injection] txID=%@ phase=%@ reason=%@ mode=%@ targetPID=%d frontmostPID=%d expectedChangeCount=%ld observedChangeCount=%ld elapsedMS=%ld result=%@",
+            "[Injection] txID=%@ phase=%@ reason=%@ mode=%@ targetPID=%d frontmostPID=%d helperActive=%d expectedChangeCount=%ld observedChangeCount=%ld elapsedMS=%ld result=%@",
             transactionID?.uuidString ?? "none",
             phase?.rawValue ?? "none",
             reason,
             mode?.rawValue ?? "none",
             targetPID ?? -1,
             frontmostPID,
+            NSApp.isActive ? 1 : 0,
             expectedChangeCount ?? -1,
             pasteboardHelper.changeCount,
             elapsedMilliseconds,

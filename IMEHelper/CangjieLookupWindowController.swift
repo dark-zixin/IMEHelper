@@ -1,5 +1,16 @@
 import Cocoa
 
+private final class CangjieLookupPanel: NSPanel {
+    override func sendEvent(_ event: NSEvent) {
+        // 明確點選查碼窗時接收鍵盤；其他視窗消失時仍不自動接任。
+        if event.type == .leftMouseDown { makeKey() }
+        super.sendEvent(event)
+    }
+
+    // 未被輸入法或刪除確認層處理的 Esc，維持原查碼視窗不關閉的行為。
+    override func cancelOperation(_ sender: Any?) {}
+}
+
 final class CangjieLookupWindowController: NSWindowController, NSWindowDelegate {
     private static var shared: CangjieLookupWindowController?
     static var isKeyWindow: Bool { shared?.window?.isKeyWindow == true }
@@ -58,9 +69,12 @@ final class CangjieLookupWindowController: NSWindowController, NSWindowDelegate 
         self.recoveryHelpURL = recoveryHelpURL
         self.openHelp = openHelp
         lookupView = CangjieLookupContentView(localize: localize)
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 244, height: 138),
-                              styleMask: [.titled, .closable, .resizable, .fullSizeContentView],
-                              backing: .buffered, defer: false)
+        let window = CangjieLookupPanel(contentRect: NSRect(x: 0, y: 0, width: 244, height: 138),
+                             styleMask: [.titled, .closable, .resizable, .fullSizeContentView],
+                             backing: .buffered, defer: false)
+        window.hidesOnDeactivate = false
+        // 輸入面板隱藏或關閉時，不自動接手焦點而被帶到其他 App 前面。
+        window.becomesKeyOnlyIfNeeded = true
         window.title = localize("lookup.title")
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
