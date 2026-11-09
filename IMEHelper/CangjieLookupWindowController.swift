@@ -157,7 +157,8 @@ final class CangjieLookupWindowController: NSWindowController, NSWindowDelegate 
     private func setPinned(_ pinned: Bool) {
         lookupView.setPinned(pinned)
         window?.level = pinned ? .floating : .normal
-        window?.collectionBehavior = pinned ? [.canJoinAllSpaces, .fullScreenAuxiliary] : []
+        // 置頂只浮在最上層、留在所在桌面；叫出時才搬到目前桌面，不跟著桌面切換跑。
+        window?.collectionBehavior = pinned ? [.moveToActiveSpace, .fullScreenAuxiliary] : []
     }
 
     private func fitWindow() {
