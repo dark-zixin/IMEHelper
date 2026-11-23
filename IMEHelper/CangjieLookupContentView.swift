@@ -486,21 +486,52 @@ final class CangjieLookupContentView: NSView, NSTextViewDelegate {
         return max(minimum, y)
     }
 
+    private struct Measurement {
+        let width: CGFloat
+        let baseQueryHeight: CGFloat
+        let detailHeight: CGFloat
+        let feedbackTextHeight: CGFloat
+        let feedbackHeight: CGFloat
+        let desiredHeight: CGFloat
+        var innerWidth: CGFloat { width - 20 }
+    }
+
+    private func measure() -> Measurement {
+        let width = max(244, bounds.width), innerWidth = width - 20
+        let queryHeight = arrange(queryRows, in: queryDocument, width: innerWidth, minimum: 30)
+        let baseQueryHeight = min(90, queryHeight)
+        let detailHeight: CGFloat = detailRow == nil ? 0 : 40
+        let feedbackTextHeight: CGFloat = status.isHidden ? 0 : max(32, ceil((status.stringValue as NSString).boundingRect(with: NSSize(width: innerWidth, height: .greatestFiniteMagnitude), options: [.usesLineFragmentOrigin], attributes: [.font: NSFont.systemFont(ofSize: 11)]).height) + 10)
+        let feedbackHeight = feedbackTextHeight + (retryButton.isHidden && recoveryButton.isHidden ? 0 : 28)
+        let desiredHeight = 108 + (baseQueryHeight - 30) + (isExpanded ? 224 + detailHeight : 30) + feedbackHeight
+        return Measurement(width: width, baseQueryHeight: baseQueryHeight, detailHeight: detailHeight,
+                           feedbackTextHeight: feedbackTextHeight, feedbackHeight: feedbackHeight, desiredHeight: desiredHeight)
+    }
+
     override func layout() {
         super.layout()
-        let width = max(244, bounds.width), innerWidth = width - 20
+        var measurement = measure()
+        // 先讓視窗依新高度縮放再擺位：縮放發生在排版途中時 AppKit 不會再重排，
+        // 若照縮放前的高度擺，收合時多出的高度會被當成手動加高，把展開鍵推出視窗。
+        // 縮放可能連帶夾窄寬度、改變換行高度，因此最多再量一次。
+        for _ in 0..<2 where abs(preferredHeight - measurement.desiredHeight) > 0.1 {
+            preferredHeight = measurement.desiredHeight
+            preferredHeightDidChange?(measurement.desiredHeight)
+            guard abs(max(244, bounds.width) - measurement.width) > 0.1 else { break }
+            measurement = measure()
+        }
+        let width = measurement.width, innerWidth = measurement.innerWidth
+        let baseQueryHeight = measurement.baseQueryHeight
+        let detailHeight = measurement.detailHeight
+        let statusWidth = innerWidth
+        let feedbackTextHeight = measurement.feedbackTextHeight
+        let feedbackHeight = measurement.feedbackHeight
+        let desiredHeight = measurement.desiredHeight
         title.frame = NSRect(x: 30, y: 5, width: width - 100, height: 18)
         pin.frame = NSRect(x: width - 58, y: 3, width: 52, height: 22)
         inputScroll.frame = NSRect(x: 10, y: 36, width: innerWidth, height: 28)
         input.setFrameSize(NSSize(width: inputScroll.contentSize.width, height: max(28, input.frame.height)))
         input.textContainer?.containerSize = NSSize(width: inputScroll.contentSize.width - 12, height: .greatestFiniteMagnitude)
-        let queryHeight = arrange(queryRows, in: queryDocument, width: innerWidth, minimum: 30)
-        let baseQueryHeight = min(90, queryHeight)
-        let detailHeight: CGFloat = detailRow == nil ? 0 : 40
-        let statusWidth = innerWidth
-        let feedbackTextHeight: CGFloat = status.isHidden ? 0 : max(32, ceil((status.stringValue as NSString).boundingRect(with: NSSize(width: statusWidth, height: .greatestFiniteMagnitude), options: [.usesLineFragmentOrigin], attributes: [.font: NSFont.systemFont(ofSize: 11)]).height) + 10)
-        let feedbackHeight = feedbackTextHeight + (retryButton.isHidden && recoveryButton.isHidden ? 0 : 28)
-        let desiredHeight = 108 + (baseQueryHeight - 30) + (isExpanded ? 224 + detailHeight : 30) + feedbackHeight
         let extra = max(0, bounds.height - desiredHeight)
         queryScroll.frame = NSRect(x: 10, y: 72, width: innerWidth, height: baseQueryHeight + extra)
         emptyQuery.frame = NSRect(x: 4, y: 5, width: innerWidth - 8, height: 22)
@@ -531,10 +562,6 @@ final class CangjieLookupContentView: NSView, NSTextViewDelegate {
         recoveryButton.frame = NSRect(x: 18 + retryWidth, y: feedbackY + feedbackTextHeight,
                                      width: ceil(max(42, recoveryButton.cell?.cellSize.width ?? 0)), height: 26)
         confirmation?.frame = NSRect(x: 0, y: 28, width: width, height: bounds.height - 28)
-        if abs(preferredHeight - desiredHeight) > 0.1 {
-            preferredHeight = desiredHeight
-            preferredHeightDidChange?(desiredHeight)
-        }
     }
 
     override func draw(_ dirtyRect: NSRect) {

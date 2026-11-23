@@ -65,6 +65,13 @@ struct CangjieUITestRunner {
                    "\(label) 尺寸應為 \(width)×\(height)，實際 \(window.frame.width)×\(window.frame.height)")
     }
 
+    private static func toggleVisible(_ controller: CangjieLookupWindowController, _ label: String) throws {
+        let view = controller.lookupView
+        let toggle: NSButton = try find("cangjie-saved-toggle", in: view)
+        try expect(toggle.frame.minY >= 0 && toggle.frame.maxY <= view.bounds.height + 0.5,
+                   "\(label) 展開鍵應在視窗內，實際 y=\(toggle.frame.minY)～\(toggle.frame.maxY)，視窗高 \(view.bounds.height)")
+    }
+
     private static func capture(_ controller: CangjieLookupWindowController, to url: URL) throws {
         let view = controller.lookupView
         view.layoutSubtreeIfNeeded()
@@ -185,6 +192,7 @@ struct CangjieUITestRunner {
                 try expect(!store.entries.contains { $0.id == recentID }, "近期字的刪除入口可用")
                 try tap("cangjie-manage", view)
                 try tap("cangjie-saved-toggle", view)
+                try toggleVisible(controller, "選字後收合")
                 input("牑", controller)
                 let manyRoots: NSTextView = try find("query-0-roots", in: view)
                 try expect(manyRoots.string.components(separatedBy: "\n").count == 8, "八組碼全部保留")
@@ -301,6 +309,7 @@ struct CangjieUITestRunner {
             try expect(defaults.string(forKey: "CangjieLookupManualTopLeft") == NSStringFromPoint(anchor), "夾回不得覆寫手動錨點")
             try tap("cangjie-saved-toggle", view)
             try size(controller, 244, 138, "下緣收合復位")
+            try toggleVisible(controller, "下緣收合")
             try expect(abs(controller.window!.frame.minY) <= 0.5 && defaults.string(forKey: "CangjieLookupManualTopLeft") == NSStringFromPoint(anchor), "縮回應回手動位置")
             input("具在曰", controller)
             try size(controller, 244, 198, "多字展開")
@@ -312,6 +321,7 @@ struct CangjieUITestRunner {
             controller.windowDidMove(Notification(name: NSWindow.didMoveNotification, object: controller.window))
             try tap("cangjie-saved-toggle", view)
             try expect(abs(controller.window!.frame.minY - 394) <= 0.5 && abs(controller.window!.frame.maxY - 532) <= 0.5, "手動搬動後收合保留上緣")
+            try toggleVisible(controller, "手動搬動後收合")
             controller.window!.setFrame(NSRect(x: 100, y: 374, width: 300, height: 158), display: false)
             controller.windowDidResize(Notification(name: NSWindow.didResizeNotification, object: controller.window))
             try size(controller, 300, 158, "手動縮放寬度與額外高度")
